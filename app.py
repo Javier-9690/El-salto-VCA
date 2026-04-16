@@ -37,11 +37,27 @@ def norm_rut(val):
     return str(val).strip().upper().replace('.', '').replace(' ', '')
 
 
+def quitar_tildes(texto):
+    """Elimina tildes y caracteres especiales para comparación flexible."""
+    reemplazos = {
+        'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U','Ü':'U','Ñ':'N',
+        'á':'a','é':'e','í':'i','ó':'o','ú':'u','ü':'u','ñ':'n',
+    }
+    for k, v in reemplazos.items():
+        texto = texto.replace(k, v)
+    return texto
+
+
+def normalizar_col(texto):
+    """Normaliza un nombre de columna para comparación: sin tildes, upper, sin espacios extra."""
+    return quitar_tildes(str(texto).strip().upper().replace('\n', ' ').replace('  ', ' '))
+
+
 def buscar_col(df, nombres):
-    """Busca una columna de forma case-insensitive entre varios nombres posibles."""
-    mapa = {str(c).strip().upper().replace('\n', ' '): c for c in df.columns}
+    """Busca una columna de forma flexible: sin tildes, case-insensitive."""
+    mapa = {normalizar_col(c): c for c in df.columns}
     for nombre in nombres:
-        clave = nombre.strip().upper().replace('\n', ' ')
+        clave = normalizar_col(nombre)
         if clave in mapa:
             return mapa[clave]
     return None
@@ -51,15 +67,37 @@ def buscar_col(df, nombres):
 #  Procesamiento principal
 # ─────────────────────────────────────────────
 
-def leer_excel(data_bytes, nombre_archivo=''):
-    """Lee un archivo Excel en formato .xls o .xlsx automáticamente."""
-    buf = io.BytesIO(data_bytes)
-    # Detectar por los primeros bytes: xls empieza con D0CF, xlsx con PK
-    magic = data_bytes[:4]
-    if magic[:2] == b'PK':
-        return pd.read_excel(buf, dtype=str, engine='openpyxl')
-    else:
-        return pd.read_excel(buf, dtype=str, engine='xlrd')
+def leer_excel(data_bytes):
+    """
+    Lee .xls o .xlsx automáticamente.
+    Busca la fila correcta de encabezados probando las primeras 5 filas:
+    la fila de encabezados es la primera que tiene más de 2 celdas con texto corto.
+    """
+    magic  = data_bytes[:4]
+    engine = 'openpyxl' if magic[:2] == b'PK' else 'xlrd'
+
+    # Leer sin encabezado para inspeccionar
+    df_raw = pd.read_excel(io.BytesIO(data_bytes), dtype=str,
+                           engine=engine, header=None)
+    df_raw = df_raw.fillna('')
+
+    # Encontrar la fila de encabezados: primera fila donde la mayoría de celdas
+    # son textos cortos (≤ 40 chars) y no vacíos
+    header_row = 0
+    for i in range(min(5, len(df_raw))):
+        fila = df_raw.iloc[i]
+        celdas_validas = [c for c in fila if str(c).strip() and len(str(c).strip()) <= 40]
+        if len(celdas_validas) >= 3:
+            header_row = i
+            break
+
+    df = pd.read_excel(io.BytesIO(data_bytes), dtype=str,
+                       engine=engine, header=header_row)
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.fillna('')
+    # Eliminar filas completamente vacías
+    df = df[df.apply(lambda r: any(str(v).strip() for v in r), axis=1)]
+    return df
 
 
 def procesar(mapa_bytes, salto_bytes, hotel_bytes):
@@ -417,49 +455,87 @@ PLANTILLAS = {
 def generar_plantilla(tipo):
     info = PLANTILLAS[tipo]
     wb = Workbook()
+
+    # ── Hoja 1: DATOS (encabezados en fila 1, ejemplos en fila 2+) ──
     ws = wb.active
     ws.title = "Datos"
 
     AZUL_OSCURO  = PatternFill("solid", fgColor="1F3864")
     AZUL_EJEMPLO = PatternFill("solid", fgColor="DCE6F1")
-    FONT_HDR  = Font(bold=True, color="FFFFFF", size=11)
-    FONT_EJ   = Font(italic=True, color="666666", size=10)
-    FONT_NORM = Font(size=10)
+    FONT_HDR = Font(bold=True, color="FFFFFF", size=11)
+    FONT_EJ  = Font(italic=True, color="555555", size=10)
 
-    # Fila de instrucciones (fila 1)
-    ws.merge_cells(start_row=1, start_column=1,
-                   end_row=1, end_column=len(info['columnas']))
-    ws.cell(1, 1).value = f"INSTRUCCIONES: {info['descripcion']}  |  Las filas de ejemplo (fondo azul) pueden borrarse."
-    ws.cell(1, 1).fill  = PatternFill("solid", fgColor="FFF2CC")
-    ws.cell(1, 1).font  = Font(bold=True, italic=True, size=10, color="7F6000")
-    ws.cell(1, 1).alignment = Alignment(wrap_text=True, horizontal='left', vertical='center')
-    ws.row_dimensions[1].height = 40
-
-    # Encabezados (fila 2)
+    # Encabezados en fila 1
     for col, nombre in enumerate(info['columnas'], 1):
-        c = ws.cell(2, col, nombre)
+        c = ws.cell(1, col, nombre)
         c.fill = AZUL_OSCURO
         c.font = FONT_HDR
         c.alignment = Alignment(horizontal='center', vertical='center')
-    ws.row_dimensions[2].height = 22
+    ws.row_dimensions[1].height = 22
 
-    # Filas de ejemplo (fila 3 en adelante)
-    for i, fila in enumerate(info['ejemplo'], 3):
+    # Filas de ejemplo en fila 2+
+    for i, fila in enumerate(info['ejemplo'], 2):
         for col, val in enumerate(fila, 1):
             c = ws.cell(i, col, val)
             c.fill = AZUL_EJEMPLO
             c.font = FONT_EJ
             c.alignment = Alignment(horizontal='left', vertical='center')
 
-    # Ajustar anchos de columna
+    # Ajustar anchos
     for col_idx, nombre in enumerate(info['columnas'], 1):
         max_ancho = max(len(nombre), max(
             len(str(fila[col_idx - 1])) for fila in info['ejemplo']
         )) + 4
         ws.column_dimensions[get_column_letter(col_idx)].width = min(max_ancho, 40)
 
-    # Congelar encabezados
-    ws.freeze_panes = 'A3'
+    ws.freeze_panes = 'A2'
+
+    # ── Hoja 2: INSTRUCCIONES ────────────────────────────────────────
+    wi = wb.create_sheet("INSTRUCCIONES")
+    wi.column_dimensions['A'].width = 20
+    wi.column_dimensions['B'].width = 60
+
+    HDR_FILL = PatternFill("solid", fgColor="1F3864")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=11)
+
+    wi.cell(1, 1, "Columna").fill = HDR_FILL
+    wi.cell(1, 1).font = HDR_FONT
+    wi.cell(1, 2, "Descripción").fill = HDR_FILL
+    wi.cell(1, 2).font = HDR_FONT
+
+    descripciones = {
+        # Mapa
+        'HABITACIÓN':   'Nombre de la habitación tal como aparece en el sistema de Hotelería.',
+        'CAMPAMENTO':   'Nombre del campamento al que pertenece la habitación.',
+        'MÓDULO':       'Módulo o sector dentro del campamento.',
+        'PISO':         'Número de piso.',
+        'NM SALTO':     'Nombre de la habitación tal como aparece en el sistema El Salto (NameDoorList).',
+        # El Salto
+        'FullName':     'Nombre completo de la persona en El Salto.',
+        'ExtID':        'RUT de la persona (se usa para cruzar con Hotelería).',
+        'DoorQty':      'Cantidad de puertas asignadas.',
+        'ZoneQty':      'Cantidad de zonas asignadas.',
+        'NameDoorList': 'Nombre de la habitación/puerta en El Salto.',
+        # Hotelería
+        'RUT':          'RUT de la persona (se usa para cruzar con El Salto).',
+        'NOMBRE':       'Nombre completo de la persona.',
+        'EMPRESA':      'Empresa a la que pertenece.',
+        'N°CONTRATO':   'Número de contrato.',
+        'GERENCIA':     'Gerencia o área.',
+        'SISTEMA TURNO':'Sistema o turno de trabajo.',
+    }
+
+    for i, col in enumerate(info['columnas'], 2):
+        wi.cell(i, 1, col).font = Font(bold=True, size=10)
+        wi.cell(i, 1).alignment = Alignment(vertical='center')
+        desc = descripciones.get(col, '')
+        wi.cell(i, 2, desc).alignment = Alignment(wrap_text=True, vertical='center')
+        wi.row_dimensions[i].height = 28
+
+    wi.cell(len(info['columnas']) + 3, 1,
+            "IMPORTANTE: No cambies los nombres de las columnas. "
+            "Los ejemplos en la hoja Datos (fondo azul) pueden borrarse."
+            ).font = Font(bold=True, color="C00000", size=10)
 
     buf = io.BytesIO()
     wb.save(buf)
