@@ -383,10 +383,10 @@ def _escribir_hoja(ws, datos, fill_fila=None):
     ws.append(headers)
     for celda in ws[1]:
         celda.fill = HEADER; celda.font = FHEADER; celda.alignment = ALIGN_C
-    for fila in datos:
-        ws.append([fila.get(h, '') for h in headers])
-        if fill_fila:
-            for c in ws[ws.max_row]:
+    for i, fila in enumerate(datos, start=2):
+        for j, h in enumerate(headers, start=1):
+            c = ws.cell(row=i, column=j, value=fila.get(h, ''))
+            if fill_fila:
                 c.fill = fill_fila; c.font = FCELL; c.alignment = ALIGN_L
     _ajustar_cols(ws)
 
