@@ -9,91 +9,103 @@
   <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet" />
   <style>
     :root {
-      --azul-oscuro: #1F3864;
-      --azul-medio: #2E5FA3;
-      --azul-claro: #D6E4F7;
+      --rojo:        #C8102E;
+      --rojo-oscuro: #8B0000;
+      --rojo-claro:  #FDECEA;
     }
-    body { background: #F0F4FB; font-family: 'Segoe UI', sans-serif; }
+    body { background: #F2F2F2; font-family: 'Segoe UI', sans-serif; color: #1A1A1A; }
 
-    .navbar-brand { font-weight: 700; }
+    /* Navbar */
+    .navbar-top {
+      background: #fff;
+      border-bottom: 3px solid var(--rojo);
+      padding: .65rem 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .logo-aramark { height:36px; object-fit:contain; }
+    .nav-divider  { width:1px; height:36px; background:#ddd; margin:0 1rem; }
+    .nav-title    { font-weight:700; font-size:1rem; color:#1A1A1A; }
+    .nav-sub      { font-size:.82rem; color:#666; }
 
     /* Stat cards */
     .stat-card {
-      border: none;
-      border-radius: 12px;
-      text-align: center;
-      padding: 1.2rem .8rem;
+      border: none; border-radius: 12px;
+      text-align: center; padding: 1.2rem .8rem;
       color: #fff;
       box-shadow: 0 3px 10px rgba(0,0,0,.12);
     }
-    .stat-card .num   { font-size: 2rem;  font-weight: 700; line-height: 1; }
-    .stat-card .label { font-size: .78rem; opacity: .9; margin-top: 4px; }
-    .bg-disc   { background: linear-gradient(135deg, #c0392b, #e74c3c); }
-    .bg-coin   { background: linear-gradient(135deg, #27ae60, #2ecc71); }
-    .bg-hotel  { background: linear-gradient(135deg, #e67e22, #f39c12); }
-    .bg-salto  { background: linear-gradient(135deg, #2980b9, #3498db); }
-    .bg-mapa   { background: linear-gradient(135deg, #8e44ad, #9b59b6); }
+    .stat-card .num   { font-size:2rem; font-weight:700; line-height:1; }
+    .stat-card .label { font-size:.77rem; opacity:.9; margin-top:4px; }
+    .bg-disc  { background: linear-gradient(135deg,#8B0000,#C8102E); }
+    .bg-coin  { background: linear-gradient(135deg,#27ae60,#2ecc71); }
+    .bg-hotel { background: linear-gradient(135deg,#e67e22,#f39c12); }
+    .bg-salto { background: linear-gradient(135deg,#1565c0,#1976d2); }
+    .bg-mapa  { background: linear-gradient(135deg,#6a1b9a,#8e24aa); }
+    .bg-total { background: linear-gradient(135deg,#00695c,#00897b); }
 
     /* Tabs */
-    .nav-tabs .nav-link { font-weight: 500; color: #555; border-radius: 8px 8px 0 0; }
-    .nav-tabs .nav-link.active { color: var(--azul-oscuro); border-bottom-color: #fff; }
+    .nav-tabs .nav-link { font-weight:500; color:#555; border-radius:8px 8px 0 0; }
+    .nav-tabs .nav-link.active { color:var(--rojo-oscuro); border-bottom-color:#fff; }
+    .nav-tabs .nav-link:hover  { color:var(--rojo); }
 
     /* Tabla */
     table.dataTable thead th {
-      background: var(--azul-oscuro);
-      color: #fff;
-      font-size: .82rem;
-      white-space: nowrap;
+      background: var(--rojo-oscuro);
+      color: #fff; font-size:.82rem; white-space:nowrap;
     }
-    table.dataTable tbody tr:hover { background: var(--azul-claro); }
-    .badge-disc   { background: #ffe0e0; color: #c0392b; }
-    .badge-coin   { background: #e0ffe0; color: #27ae60; }
+    table.dataTable tbody tr:hover { background: var(--rojo-claro); }
 
-    /* Download button */
+    /* Botón descarga */
     .btn-download {
-      background: linear-gradient(90deg, #27ae60, #2ecc71);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      padding: .6rem 1.6rem;
-      font-weight: 600;
+      background: linear-gradient(90deg,#27ae60,#2ecc71);
+      color:#fff; border:none; border-radius:8px;
+      padding:.55rem 1.4rem; font-weight:600;
       box-shadow: 0 3px 12px rgba(39,174,96,.3);
       transition: opacity .2s;
     }
     .btn-download:hover { opacity:.9; color:#fff; }
 
+    /* Tags sin mapa */
     .tag-sin-mapa {
-      display: inline-block;
-      background: #fff3cd;
-      border: 1px solid #ffc107;
-      border-radius: 6px;
-      padding: 2px 8px;
-      font-size: .8rem;
-      margin: 2px;
-      font-family: monospace;
+      display:inline-block;
+      background:#fff3cd; border:1px solid #ffc107;
+      border-radius:6px; padding:2px 8px;
+      font-size:.8rem; margin:2px; font-family:monospace;
     }
 
+    /* Section card */
     .section-card {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.07);
-      padding: 1.5rem;
+      background:#fff; border-radius:12px;
+      box-shadow:0 2px 10px rgba(0,0,0,.07);
+      padding:1.5rem;
+    }
+
+    /* Footer */
+    footer {
+      border-top:1px solid #ddd; padding:1rem 0;
+      font-size:.8rem; color:#999; text-align:center; margin-top:3rem;
     }
   </style>
 </head>
 <body>
 
 <!-- Navbar -->
-<nav class="navbar navbar-dark" style="background: var(--azul-oscuro);">
-  <div class="container d-flex justify-content-between align-items-center">
-    <span class="navbar-brand">
-      <i class="bi bi-building me-2"></i>Comparador de Habitaciones
-    </span>
+<nav class="navbar-top">
+  <div class="container d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center">
+      <img src="/static/logo.png" alt="Aramark" class="logo-aramark"
+           onerror="this.style.display='none'">
+      <div class="nav-divider"></div>
+      <div>
+        <div class="nav-title"><i class="bi bi-building me-1"></i>El Salto – Hotelería</div>
+        <div class="nav-sub">Resultados de la comparación</div>
+      </div>
+    </div>
     <div class="d-flex gap-2">
       <a href="/descargar/{{ token }}" class="btn btn-download btn-sm" download>
         <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
       </a>
-      <a href="/" class="btn btn-outline-light btn-sm">
+      <a href="/" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left me-1"></i>Nueva comparación
       </a>
     </div>
@@ -102,7 +114,7 @@
 
 <div class="container py-4">
 
-  <!-- ── Estadísticas ─────────────────────────────── -->
+  <!-- Estadísticas -->
   <div class="row g-3 mb-4">
     <div class="col-6 col-md-2">
       <div class="stat-card bg-disc">
@@ -135,14 +147,14 @@
       </div>
     </div>
     <div class="col-6 col-md-2">
-      <div class="stat-card" style="background:linear-gradient(135deg,#16a085,#1abc9c)">
+      <div class="stat-card bg-total">
         <div class="num">{{ results.stats.total_hotel }}</div>
         <div class="label">Total en Hotelería</div>
       </div>
     </div>
   </div>
 
-  <!-- ── Tabs ─────────────────────────────────────── -->
+  <!-- Tabs -->
   <ul class="nav nav-tabs mb-0" id="mainTabs">
     <li class="nav-item">
       <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-disc">
@@ -181,28 +193,22 @@
     </li>
   </ul>
 
-  <div class="tab-content section-card" style="border-radius: 0 0 12px 12px;">
+  <div class="tab-content section-card" style="border-radius:0 0 12px 12px;">
 
-    <!-- ── Tab 1: Discrepancias ───────────────────── -->
+    <!-- Tab 1: Discrepancias -->
     <div class="tab-pane fade show active" id="tab-disc">
       <p class="text-muted small mt-3 mb-3">
         <i class="bi bi-info-circle me-1"></i>
-        Personas cuyo RUT aparece en ambas bases de datos, pero con habitaciones distintas
-        (según la equivalencia del mapa).
+        Personas cuyo RUT aparece en ambas bases, pero con habitaciones distintas según el mapa.
       </p>
       {% if results.discrepancias %}
       <div class="table-responsive">
         <table class="table table-sm table-bordered dataTable" id="tbl-disc">
           <thead>
             <tr>
-              <th>RUT</th>
-              <th>Nombre Hotelería</th>
-              <th>Nombre El Salto</th>
-              <th>HAB Hotelería</th>
-              <th>HAB El Salto</th>
-              <th>Equiv Hotel→Salto</th>
-              <th>Empresa</th>
-              <th>Módulo</th>
+              <th>RUT</th><th>Nombre Hotelería</th><th>Nombre El Salto</th>
+              <th>HAB Hotelería</th><th>HAB El Salto</th>
+              <th>Equiv Hotel→Salto</th><th>Empresa</th><th>Módulo</th>
             </tr>
           </thead>
           <tbody>
@@ -228,7 +234,7 @@
       {% endif %}
     </div>
 
-    <!-- ── Tab 2: Solo Hotelería ──────────────────── -->
+    <!-- Tab 2: Solo Hotelería -->
     <div class="tab-pane fade" id="tab-solo-hotel">
       <p class="text-muted small mt-3 mb-3">
         <i class="bi bi-info-circle me-1"></i>
@@ -239,14 +245,9 @@
         <table class="table table-sm table-bordered dataTable" id="tbl-hotel">
           <thead>
             <tr>
-              <th>RUT</th>
-              <th>Nombre</th>
-              <th>HABITACIÓN</th>
-              <th>Empresa</th>
-              <th>Módulo</th>
-              <th>N°Contrato</th>
-              <th>Gerencia</th>
-              <th>Turno</th>
+              <th>RUT</th><th>Nombre</th><th>HABITACIÓN</th>
+              <th>Empresa</th><th>Módulo</th>
+              <th>N°Contrato</th><th>Gerencia</th><th>Turno</th>
             </tr>
           </thead>
           <tbody>
@@ -272,7 +273,7 @@
       {% endif %}
     </div>
 
-    <!-- ── Tab 3: Solo El Salto ───────────────────── -->
+    <!-- Tab 3: Solo El Salto -->
     <div class="tab-pane fade" id="tab-solo-salto">
       <p class="text-muted small mt-3 mb-3">
         <i class="bi bi-info-circle me-1"></i>
@@ -283,10 +284,8 @@
         <table class="table table-sm table-bordered dataTable" id="tbl-salto">
           <thead>
             <tr>
-              <th>RUT/ExtID</th>
-              <th>Nombre</th>
-              <th>HAB El Salto</th>
-              <th>HAB Equivalente (Hotelería)</th>
+              <th>RUT/ExtID</th><th>Nombre</th>
+              <th>HAB El Salto</th><th>HAB Equivalente (Hotelería)</th>
             </tr>
           </thead>
           <tbody>
@@ -308,7 +307,7 @@
       {% endif %}
     </div>
 
-    <!-- ── Tab 4: Coincidencias ───────────────────── -->
+    <!-- Tab 4: Coincidencias -->
     <div class="tab-pane fade" id="tab-coin">
       <p class="text-muted small mt-3 mb-3">
         <i class="bi bi-info-circle me-1"></i>
@@ -319,13 +318,9 @@
         <table class="table table-sm table-bordered dataTable" id="tbl-coin">
           <thead>
             <tr>
-              <th>RUT</th>
-              <th>Nombre Hotelería</th>
-              <th>Nombre El Salto</th>
-              <th>HAB Hotelería</th>
-              <th>HAB El Salto</th>
-              <th>Empresa</th>
-              <th>Módulo</th>
+              <th>RUT</th><th>Nombre Hotelería</th><th>Nombre El Salto</th>
+              <th>HAB Hotelería</th><th>HAB El Salto</th>
+              <th>Empresa</th><th>Módulo</th>
             </tr>
           </thead>
           <tbody>
@@ -350,7 +345,7 @@
       {% endif %}
     </div>
 
-    <!-- ── Tab 5: Sin mapa ────────────────────────── -->
+    <!-- Tab 5: Sin mapa -->
     <div class="tab-pane fade" id="tab-sinmapa">
       <div class="row mt-3 g-3">
         <div class="col-md-6">
@@ -360,15 +355,16 @@
             <span class="badge bg-warning text-dark">{{ results.hab_sin_mapa | length }}</span>
           </h6>
           <p class="text-muted small">
-            Estas habitaciones no tienen una entrada correspondiente en la columna HABITACIÓN del Mapa.
-            Agrega la equivalencia al Mapa para incluirlas en el análisis.
+            Estas habitaciones no tienen entrada en la columna HABITACIÓN del Mapa.
           </p>
           {% if results.hab_sin_mapa %}
             {% for h in results.hab_sin_mapa %}
             <span class="tag-sin-mapa">{{ h }}</span>
             {% endfor %}
           {% else %}
-            <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Todas las habitaciones tienen mapeo.</span>
+            <span class="text-success small">
+              <i class="bi bi-check-circle me-1"></i>Todas las habitaciones tienen mapeo.
+            </span>
           {% endif %}
         </div>
         <div class="col-md-6">
@@ -378,15 +374,16 @@
             <span class="badge bg-primary">{{ results.door_sin_mapa | length }}</span>
           </h6>
           <p class="text-muted small">
-            Estas habitaciones no tienen una entrada correspondiente en la columna NM SALTO del Mapa.
-            Agrega la equivalencia al Mapa para incluirlas en el análisis.
+            Estas habitaciones no tienen entrada en la columna NM SALTO del Mapa.
           </p>
           {% if results.door_sin_mapa %}
             {% for d in results.door_sin_mapa %}
             <span class="tag-sin-mapa">{{ d }}</span>
             {% endfor %}
           {% else %}
-            <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Todas las habitaciones tienen mapeo.</span>
+            <span class="text-success small">
+              <i class="bi bi-check-circle me-1"></i>Todas las habitaciones tienen mapeo.
+            </span>
           {% endif %}
         </div>
       </div>
@@ -396,15 +393,21 @@
 
 </div><!-- /container -->
 
-<!-- Scripts -->
+<footer>
+  <div class="container">
+    <img src="/static/logo.png" alt="Aramark"
+         style="height:22px; opacity:.4; margin-bottom:4px;" onerror="this.style.display='none'">
+    <div>© 2025 Aramark · El Salto – Herramienta interna de control hotelero</div>
+  </div>
+</footer>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script>
   $(document).ready(function () {
-    // Inicializar DataTables en las tablas existentes
-    const tabIds = ['disc', 'hotel', 'salto', 'coin'];
+    const tabIds = ['disc','hotel','salto','coin'];
     tabIds.forEach(function(id) {
       const el = $('#tbl-' + id);
       if (el.length && el.find('tbody tr').length) {
@@ -415,17 +418,15 @@
             lengthMenu:   "Mostrar _MENU_ registros",
             info:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
             infoEmpty:    "Sin registros",
-            paginate: { first: "«", last: "»", next: "›", previous: "‹" },
+            paginate: { first:"«", last:"»", next:"›", previous:"‹" },
             zeroRecords:  "Sin resultados para esa búsqueda"
           },
-          order: [[0, 'asc']]
+          order: [[0,'asc']]
         });
       }
     });
-
-    // Re-inicializar DataTables cuando se activa un tab (evita columnas desalineadas)
     $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function () {
-      $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+      $.fn.dataTable.tables({ visible:true, api:true }).columns.adjust();
     });
   });
 </script>
