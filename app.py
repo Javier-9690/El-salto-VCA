@@ -51,12 +51,23 @@ def buscar_col(df, nombres):
 #  Procesamiento principal
 # ─────────────────────────────────────────────
 
+def leer_excel(data_bytes, nombre_archivo=''):
+    """Lee un archivo Excel en formato .xls o .xlsx automáticamente."""
+    buf = io.BytesIO(data_bytes)
+    # Detectar por los primeros bytes: xls empieza con D0CF, xlsx con PK
+    magic = data_bytes[:4]
+    if magic[:2] == b'PK':
+        return pd.read_excel(buf, dtype=str, engine='openpyxl')
+    else:
+        return pd.read_excel(buf, dtype=str, engine='xlrd')
+
+
 def procesar(mapa_bytes, salto_bytes, hotel_bytes):
     """Lee los tres archivos Excel y devuelve un dict con todos los resultados."""
 
-    df_map  = pd.read_excel(io.BytesIO(mapa_bytes),  dtype=str)
-    df_sal  = pd.read_excel(io.BytesIO(salto_bytes), dtype=str)
-    df_hot  = pd.read_excel(io.BytesIO(hotel_bytes), dtype=str)
+    df_map  = leer_excel(mapa_bytes)
+    df_sal  = leer_excel(salto_bytes)
+    df_hot  = leer_excel(hotel_bytes)
 
     # Limpiar nombres de columnas
     for df in [df_map, df_sal, df_hot]:
@@ -365,6 +376,107 @@ def descargar(token):
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
         download_name='reporte_diferencias.xlsx'
+    )
+
+
+# ─────────────────────────────────────────────
+#  Descarga de plantillas vacías
+# ─────────────────────────────────────────────
+
+PLANTILLAS = {
+    'mapa': {
+        'nombre': 'plantilla_mapa_habitaciones.xlsx',
+        'columnas': ['HABITACIÓN', 'CAMPAMENTO', 'MÓDULO', 'PISO', 'NM SALTO'],
+        'ejemplo': [
+            ['HAB-101', 'CAMPAMENTO A', 'MÓDULO 1', '1', 'SALTO-101'],
+            ['HAB-102', 'CAMPAMENTO A', 'MÓDULO 1', '1', 'SALTO-102'],
+        ],
+        'descripcion': 'Mapa de equivalencias entre nombres de habitación en Hotelería (columna HABITACIÓN) y en El Salto (columna NM SALTO).'
+    },
+    'salto': {
+        'nombre': 'plantilla_base_el_salto.xlsx',
+        'columnas': ['FullName', 'ExtID', 'DoorQty', 'ZoneQty', 'NameDoorList'],
+        'ejemplo': [
+            ['Juan Pérez', '12345678-9', '1', '1', 'SALTO-101'],
+            ['María González', '98765432-1', '1', '1', 'SALTO-205'],
+        ],
+        'descripcion': 'Base de datos del sistema El Salto. ExtID debe contener el RUT de la persona. NameDoorList es el nombre de la habitación según El Salto.'
+    },
+    'hotel': {
+        'nombre': 'plantilla_base_hoteleria.xlsx',
+        'columnas': ['HABITACIÓN', 'MÓDULO', 'RUT', 'NOMBRE', 'EMPRESA', 'N°CONTRATO', 'GERENCIA', 'SISTEMA TURNO'],
+        'ejemplo': [
+            ['HAB-101', 'MÓDULO 1', '12345678-9', 'Juan Pérez', 'Empresa A', 'CONT-001', 'GERENCIA 1', 'A'],
+            ['HAB-205', 'MÓDULO 2', '98765432-1', 'María González', 'Empresa B', 'CONT-002', 'GERENCIA 2', 'B'],
+        ],
+        'descripcion': 'Base de datos de Hotelería con las asignaciones actuales de habitaciones.'
+    },
+}
+
+
+def generar_plantilla(tipo):
+    info = PLANTILLAS[tipo]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Datos"
+
+    AZUL_OSCURO  = PatternFill("solid", fgColor="1F3864")
+    AZUL_EJEMPLO = PatternFill("solid", fgColor="DCE6F1")
+    FONT_HDR  = Font(bold=True, color="FFFFFF", size=11)
+    FONT_EJ   = Font(italic=True, color="666666", size=10)
+    FONT_NORM = Font(size=10)
+
+    # Fila de instrucciones (fila 1)
+    ws.merge_cells(start_row=1, start_column=1,
+                   end_row=1, end_column=len(info['columnas']))
+    ws.cell(1, 1).value = f"INSTRUCCIONES: {info['descripcion']}  |  Las filas de ejemplo (fondo azul) pueden borrarse."
+    ws.cell(1, 1).fill  = PatternFill("solid", fgColor="FFF2CC")
+    ws.cell(1, 1).font  = Font(bold=True, italic=True, size=10, color="7F6000")
+    ws.cell(1, 1).alignment = Alignment(wrap_text=True, horizontal='left', vertical='center')
+    ws.row_dimensions[1].height = 40
+
+    # Encabezados (fila 2)
+    for col, nombre in enumerate(info['columnas'], 1):
+        c = ws.cell(2, col, nombre)
+        c.fill = AZUL_OSCURO
+        c.font = FONT_HDR
+        c.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[2].height = 22
+
+    # Filas de ejemplo (fila 3 en adelante)
+    for i, fila in enumerate(info['ejemplo'], 3):
+        for col, val in enumerate(fila, 1):
+            c = ws.cell(i, col, val)
+            c.fill = AZUL_EJEMPLO
+            c.font = FONT_EJ
+            c.alignment = Alignment(horizontal='left', vertical='center')
+
+    # Ajustar anchos de columna
+    for col_idx, nombre in enumerate(info['columnas'], 1):
+        max_ancho = max(len(nombre), max(
+            len(str(fila[col_idx - 1])) for fila in info['ejemplo']
+        )) + 4
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(max_ancho, 40)
+
+    # Congelar encabezados
+    ws.freeze_panes = 'A3'
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@app.route('/plantilla/<tipo>')
+def descargar_plantilla(tipo):
+    if tipo not in PLANTILLAS:
+        return "Plantilla no encontrada.", 404
+    buf = generar_plantilla(tipo)
+    return send_file(
+        buf,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=PLANTILLAS[tipo]['nombre']
     )
 
 
