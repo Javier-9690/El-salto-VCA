@@ -229,15 +229,19 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
     sal_name = buscar_col(df_sal, ['FullName', 'FULLNAME', 'FULL NAME'])
 
     # ── Columnas Hotelería ─────────────────────────────────────────
-    hot_hab   = buscar_col(df_hot, ['HABITACIÓN', 'HABITACION', 'HAB'])
-    hot_rut   = buscar_col(df_hot, ['RUT'])
-    hot_nom   = buscar_col(df_hot, ['NOMBRE'])
+    hot_hab   = buscar_col(df_hot, ['HABITACIÓN', 'HABITACION', 'HAB',
+                                     'HABITACION ', 'N° HAB', 'N°HAB', 'NRO HAB',
+                                     'NUMERO HABITACION', 'NUMERO HABITACIÓN'])
+    hot_rut   = buscar_col(df_hot, ['RUT', 'RUT TRABAJADOR', 'RUT_TRABAJADOR',
+                                     'RUTTRABAJADOR', 'RUT PERSONA', 'DNI'])
+    hot_nom   = buscar_col(df_hot, ['NOMBRE', 'NOMBRE COMPLETO', 'NOMBRES'])
     hot_emp   = buscar_col(df_hot, ['EMPRESA'])
     hot_mod   = buscar_col(df_hot, ['MÓDULO', 'MODULO'])
-    hot_cont  = buscar_col(df_hot, ['N°CONTRATO', 'N CONTRATO', 'NCONTRATO'])
+    hot_cont  = buscar_col(df_hot, ['N°CONTRATO', 'N CONTRATO', 'NCONTRATO',
+                                     'NUMERO CONTRATO', 'N° CONTRATO'])
     hot_ger   = buscar_col(df_hot, ['GERENCIA'])
     hot_turno = buscar_col(df_hot, ['SISTEMA TURNO', 'SISTEMATURNO', 'TURNO',
-                                     'SISTEMA\nTURNO'])
+                                     'SISTEMA\nTURNO', 'SISTEMA_TURNO'])
 
     faltantes = []
     if not map_hab:  faltantes.append("HABITACIÓN  →  Mapa de habitaciones")
@@ -246,7 +250,15 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
     if not hot_hab:  faltantes.append("HABITACIÓN  →  Base de datos Hotelería")
     if not hot_rut:  faltantes.append("RUT         →  Base de datos Hotelería")
     if faltantes:
-        raise ValueError("Columnas no encontradas:\n" + "\n".join(faltantes))
+        cols_hot = list(df_hot.columns)
+        cols_sal = list(df_sal.columns)
+        cols_map = list(df_map.columns)
+        raise ValueError(
+            "Columnas no encontradas:\n" + "\n".join(faltantes) +
+            f"\n\n── Columnas detectadas en Hotelería ──\n{cols_hot}" +
+            f"\n\n── Columnas detectadas en El Salto ──\n{cols_sal}" +
+            f"\n\n── Columnas detectadas en Mapa ──\n{cols_map}"
+        )
 
     # ── Mapeo bidireccional de habitaciones ───────────────────────
     h2n, n2h = {}, {}
