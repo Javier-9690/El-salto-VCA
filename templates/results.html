@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resultados – Comparador de Habitaciones</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet" />
+  <style>
+    :root {
+      --azul-oscuro: #1F3864;
+      --azul-medio: #2E5FA3;
+      --azul-claro: #D6E4F7;
+    }
+    body { background: #F0F4FB; font-family: 'Segoe UI', sans-serif; }
+
+    .navbar-brand { font-weight: 700; }
+
+    /* Stat cards */
+    .stat-card {
+      border: none;
+      border-radius: 12px;
+      text-align: center;
+      padding: 1.2rem .8rem;
+      color: #fff;
+      box-shadow: 0 3px 10px rgba(0,0,0,.12);
+    }
+    .stat-card .num   { font-size: 2rem;  font-weight: 700; line-height: 1; }
+    .stat-card .label { font-size: .78rem; opacity: .9; margin-top: 4px; }
+    .bg-disc   { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+    .bg-coin   { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+    .bg-hotel  { background: linear-gradient(135deg, #e67e22, #f39c12); }
+    .bg-salto  { background: linear-gradient(135deg, #2980b9, #3498db); }
+    .bg-mapa   { background: linear-gradient(135deg, #8e44ad, #9b59b6); }
+
+    /* Tabs */
+    .nav-tabs .nav-link { font-weight: 500; color: #555; border-radius: 8px 8px 0 0; }
+    .nav-tabs .nav-link.active { color: var(--azul-oscuro); border-bottom-color: #fff; }
+
+    /* Tabla */
+    table.dataTable thead th {
+      background: var(--azul-oscuro);
+      color: #fff;
+      font-size: .82rem;
+      white-space: nowrap;
+    }
+    table.dataTable tbody tr:hover { background: var(--azul-claro); }
+    .badge-disc   { background: #ffe0e0; color: #c0392b; }
+    .badge-coin   { background: #e0ffe0; color: #27ae60; }
+
+    /* Download button */
+    .btn-download {
+      background: linear-gradient(90deg, #27ae60, #2ecc71);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .6rem 1.6rem;
+      font-weight: 600;
+      box-shadow: 0 3px 12px rgba(39,174,96,.3);
+      transition: opacity .2s;
+    }
+    .btn-download:hover { opacity:.9; color:#fff; }
+
+    .tag-sin-mapa {
+      display: inline-block;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: .8rem;
+      margin: 2px;
+      font-family: monospace;
+    }
+
+    .section-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+      padding: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark" style="background: var(--azul-oscuro);">
+  <div class="container d-flex justify-content-between align-items-center">
+    <span class="navbar-brand">
+      <i class="bi bi-building me-2"></i>Comparador de Habitaciones
+    </span>
+    <div class="d-flex gap-2">
+      <a href="/descargar/{{ token }}" class="btn btn-download btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
+      </a>
+      <a href="/" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Nueva comparación
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+
+  <!-- ── Estadísticas ─────────────────────────────── -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-2">
+      <div class="stat-card bg-disc">
+        <div class="num">{{ results.stats.discrepancias }}</div>
+        <div class="label">Discrepancias por RUT</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="stat-card bg-coin">
+        <div class="num">{{ results.stats.coincidencias }}</div>
+        <div class="label">Coincidencias</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="stat-card bg-hotel">
+        <div class="num">{{ results.stats.solo_hotel }}</div>
+        <div class="label">Solo en Hotelería</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="stat-card bg-salto">
+        <div class="num">{{ results.stats.solo_salto }}</div>
+        <div class="label">Solo en El Salto</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="stat-card bg-mapa">
+        <div class="num">{{ results.stats.hab_sin_mapa }}</div>
+        <div class="label">HAB sin mapa (Hotelería)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-2">
+      <div class="stat-card" style="background:linear-gradient(135deg,#16a085,#1abc9c)">
+        <div class="num">{{ results.stats.total_hotel }}</div>
+        <div class="label">Total en Hotelería</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tabs ─────────────────────────────────────── -->
+  <ul class="nav nav-tabs mb-0" id="mainTabs">
+    <li class="nav-item">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-disc">
+        <i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>
+        Discrepancias
+        <span class="badge bg-danger ms-1">{{ results.discrepancias | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-solo-hotel">
+        <i class="bi bi-building text-warning me-1"></i>
+        Solo Hotelería
+        <span class="badge bg-warning text-dark ms-1">{{ results.solo_hotel | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-solo-salto">
+        <i class="bi bi-door-open text-primary me-1"></i>
+        Solo El Salto
+        <span class="badge bg-primary ms-1">{{ results.solo_salto | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-coin">
+        <i class="bi bi-check-circle-fill text-success me-1"></i>
+        Coincidencias
+        <span class="badge bg-success ms-1">{{ results.coincidencias | length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sinmapa">
+        <i class="bi bi-question-circle text-secondary me-1"></i>
+        Sin mapa
+        <span class="badge bg-secondary ms-1">{{ (results.hab_sin_mapa | length) + (results.door_sin_mapa | length) }}</span>
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content section-card" style="border-radius: 0 0 12px 12px;">
+
+    <!-- ── Tab 1: Discrepancias ───────────────────── -->
+    <div class="tab-pane fade show active" id="tab-disc">
+      <p class="text-muted small mt-3 mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Personas cuyo RUT aparece en ambas bases de datos, pero con habitaciones distintas
+        (según la equivalencia del mapa).
+      </p>
+      {% if results.discrepancias %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered dataTable" id="tbl-disc">
+          <thead>
+            <tr>
+              <th>RUT</th>
+              <th>Nombre Hotelería</th>
+              <th>Nombre El Salto</th>
+              <th>HAB Hotelería</th>
+              <th>HAB El Salto</th>
+              <th>Equiv Hotel→Salto</th>
+              <th>Empresa</th>
+              <th>Módulo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results.discrepancias %}
+            <tr>
+              <td><code>{{ r.RUT }}</code></td>
+              <td>{{ r['Nombre Hotelería'] }}</td>
+              <td>{{ r['Nombre El Salto'] }}</td>
+              <td><span class="badge bg-danger bg-opacity-75">{{ r['HAB Hotelería'] }}</span></td>
+              <td><span class="badge bg-warning text-dark">{{ r['HAB El Salto'] }}</span></td>
+              <td class="text-muted small">{{ r['Equiv Hotel→Salto'] }}</td>
+              <td>{{ r.Empresa }}</td>
+              <td>{{ r['Módulo'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-success mt-3">
+        <i class="bi bi-check-circle-fill me-2"></i>¡Sin discrepancias! Todos los RUT coinciden en habitación.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Tab 2: Solo Hotelería ──────────────────── -->
+    <div class="tab-pane fade" id="tab-solo-hotel">
+      <p class="text-muted small mt-3 mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Personas que están en Hotelería pero <strong>no se encontró su RUT en El Salto</strong>.
+      </p>
+      {% if results.solo_hotel %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered dataTable" id="tbl-hotel">
+          <thead>
+            <tr>
+              <th>RUT</th>
+              <th>Nombre</th>
+              <th>HABITACIÓN</th>
+              <th>Empresa</th>
+              <th>Módulo</th>
+              <th>N°Contrato</th>
+              <th>Gerencia</th>
+              <th>Turno</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results.solo_hotel %}
+            <tr>
+              <td><code>{{ r.RUT }}</code></td>
+              <td>{{ r.Nombre }}</td>
+              <td><span class="badge" style="background:#e67e22">{{ r['HABITACIÓN'] }}</span></td>
+              <td>{{ r.Empresa }}</td>
+              <td>{{ r['Módulo'] }}</td>
+              <td>{{ r['N°Contrato'] }}</td>
+              <td>{{ r.Gerencia }}</td>
+              <td>{{ r.Turno }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-success mt-3">
+        <i class="bi bi-check-circle-fill me-2"></i>Todos los RUT de Hotelería están también en El Salto.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Tab 3: Solo El Salto ───────────────────── -->
+    <div class="tab-pane fade" id="tab-solo-salto">
+      <p class="text-muted small mt-3 mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Personas que están en El Salto pero <strong>no se encontró su ExtID en Hotelería</strong>.
+      </p>
+      {% if results.solo_salto %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered dataTable" id="tbl-salto">
+          <thead>
+            <tr>
+              <th>RUT/ExtID</th>
+              <th>Nombre</th>
+              <th>HAB El Salto</th>
+              <th>HAB Equivalente (Hotelería)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results.solo_salto %}
+            <tr>
+              <td><code>{{ r['RUT/ExtID'] }}</code></td>
+              <td>{{ r.Nombre }}</td>
+              <td><span class="badge bg-primary">{{ r['HAB El Salto'] }}</span></td>
+              <td class="text-muted">{{ r['HAB Equivalente'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-success mt-3">
+        <i class="bi bi-check-circle-fill me-2"></i>Todos los ExtID de El Salto están también en Hotelería.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Tab 4: Coincidencias ───────────────────── -->
+    <div class="tab-pane fade" id="tab-coin">
+      <p class="text-muted small mt-3 mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Personas cuyo RUT y habitación coinciden perfectamente en ambos sistemas.
+      </p>
+      {% if results.coincidencias %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered dataTable" id="tbl-coin">
+          <thead>
+            <tr>
+              <th>RUT</th>
+              <th>Nombre Hotelería</th>
+              <th>Nombre El Salto</th>
+              <th>HAB Hotelería</th>
+              <th>HAB El Salto</th>
+              <th>Empresa</th>
+              <th>Módulo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results.coincidencias %}
+            <tr>
+              <td><code>{{ r.RUT }}</code></td>
+              <td>{{ r['Nombre Hotelería'] }}</td>
+              <td>{{ r['Nombre El Salto'] }}</td>
+              <td><span class="badge bg-success">{{ r['HAB Hotelería'] }}</span></td>
+              <td><span class="badge bg-success">{{ r['HAB El Salto'] }}</span></td>
+              <td>{{ r.Empresa }}</td>
+              <td>{{ r['Módulo'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-warning mt-3">
+        <i class="bi bi-exclamation-triangle me-2"></i>No se encontraron coincidencias exactas.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ── Tab 5: Sin mapa ────────────────────────── -->
+    <div class="tab-pane fade" id="tab-sinmapa">
+      <div class="row mt-3 g-3">
+        <div class="col-md-6">
+          <h6 class="fw-bold text-warning">
+            <i class="bi bi-building me-1"></i>
+            Habitaciones de Hotelería sin equivalente en el Mapa
+            <span class="badge bg-warning text-dark">{{ results.hab_sin_mapa | length }}</span>
+          </h6>
+          <p class="text-muted small">
+            Estas habitaciones no tienen una entrada correspondiente en la columna HABITACIÓN del Mapa.
+            Agrega la equivalencia al Mapa para incluirlas en el análisis.
+          </p>
+          {% if results.hab_sin_mapa %}
+            {% for h in results.hab_sin_mapa %}
+            <span class="tag-sin-mapa">{{ h }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Todas las habitaciones tienen mapeo.</span>
+          {% endif %}
+        </div>
+        <div class="col-md-6">
+          <h6 class="fw-bold text-primary">
+            <i class="bi bi-door-open me-1"></i>
+            Habitaciones de El Salto sin equivalente en el Mapa
+            <span class="badge bg-primary">{{ results.door_sin_mapa | length }}</span>
+          </h6>
+          <p class="text-muted small">
+            Estas habitaciones no tienen una entrada correspondiente en la columna NM SALTO del Mapa.
+            Agrega la equivalencia al Mapa para incluirlas en el análisis.
+          </p>
+          {% if results.door_sin_mapa %}
+            {% for d in results.door_sin_mapa %}
+            <span class="tag-sin-mapa">{{ d }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Todas las habitaciones tienen mapeo.</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
+
+</div><!-- /container -->
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script>
+  $(document).ready(function () {
+    // Inicializar DataTables en las tablas existentes
+    const tabIds = ['disc', 'hotel', 'salto', 'coin'];
+    tabIds.forEach(function(id) {
+      const el = $('#tbl-' + id);
+      if (el.length && el.find('tbody tr').length) {
+        el.DataTable({
+          pageLength: 25,
+          language: {
+            search:       "Buscar:",
+            lengthMenu:   "Mostrar _MENU_ registros",
+            info:         "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            infoEmpty:    "Sin registros",
+            paginate: { first: "«", last: "»", next: "›", previous: "‹" },
+            zeroRecords:  "Sin resultados para esa búsqueda"
+          },
+          order: [[0, 'asc']]
+        });
+      }
+    });
+
+    // Re-inicializar DataTables cuando se activa un tab (evita columnas desalineadas)
+    $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function () {
+      $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+    });
+  });
+</script>
+</body>
+</html>

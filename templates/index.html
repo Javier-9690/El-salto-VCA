@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comparador de Habitaciones – El Salto</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <style>
+    :root {
+      --azul-oscuro: #1F3864;
+      --azul-medio: #2E5FA3;
+      --azul-claro: #D6E4F7;
+    }
+    body { background: #F0F4FB; font-family: 'Segoe UI', sans-serif; }
+
+    .navbar-brand { font-weight: 700; letter-spacing: 0.5px; }
+
+    .hero {
+      background: linear-gradient(135deg, var(--azul-oscuro) 0%, var(--azul-medio) 100%);
+      color: #fff;
+      padding: 2.5rem 0 1.5rem;
+    }
+    .hero h1 { font-size: 1.8rem; font-weight: 700; }
+    .hero p   { opacity: .85; }
+
+    .card-file {
+      border: 2px dashed #B0C4E0;
+      border-radius: 12px;
+      background: #fff;
+      transition: border-color .2s, box-shadow .2s;
+      cursor: pointer;
+    }
+    .card-file:hover { border-color: var(--azul-medio); box-shadow: 0 4px 18px rgba(30,63,100,.12); }
+    .card-file .icon { font-size: 2.2rem; color: var(--azul-medio); }
+    .card-file .badge-cols {
+      font-size: .72rem;
+      background: var(--azul-claro);
+      color: var(--azul-oscuro);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-family: monospace;
+    }
+
+    .file-selected { border-color: #28a745 !important; background: #F0FFF4 !important; }
+    .file-selected .icon { color: #28a745 !important; }
+
+    input[type="file"] { display: none; }
+
+    .btn-procesar {
+      background: linear-gradient(90deg, var(--azul-oscuro), var(--azul-medio));
+      color: #fff;
+      border: none;
+      padding: .75rem 3rem;
+      font-size: 1.05rem;
+      border-radius: 8px;
+      font-weight: 600;
+      box-shadow: 0 4px 14px rgba(30,63,100,.3);
+      transition: opacity .2s;
+    }
+    .btn-procesar:hover { opacity: .9; color: #fff; }
+    .btn-procesar:disabled { opacity: .5; }
+
+    .alert-custom {
+      border-left: 4px solid #dc3545;
+      background: #fff5f5;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark" style="background: var(--azul-oscuro);">
+  <div class="container">
+    <span class="navbar-brand">
+      <i class="bi bi-building me-2"></i>Comparador de Habitaciones
+    </span>
+    <span class="text-white-50 small">El Salto – Hotelería</span>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="container">
+    <h1><i class="bi bi-arrow-left-right me-2"></i>Comparador de Asignaciones</h1>
+    <p class="mb-0">
+      Carga los tres archivos exportados directamente desde el sistema para detectar
+      discrepancias de habitaciones entre <strong>El Salto</strong> y <strong>Hotelería</strong>.
+    </p>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="container py-4">
+
+  {% if error %}
+  <div class="alert alert-custom d-flex align-items-start gap-2 mb-4">
+    <i class="bi bi-exclamation-triangle-fill text-danger mt-1"></i>
+    <div>
+      <strong>Error al procesar</strong>
+      <pre class="mb-0 mt-1" style="font-size:.85rem;">{{ error }}</pre>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/procesar" enctype="multipart/form-data" id="uploadForm">
+
+    <div class="row g-3 mb-4">
+
+      <!-- Mapa de Habitaciones -->
+      <div class="col-md-4">
+        <label for="mapa" style="cursor:pointer; width:100%;">
+          <div class="card-file p-4 text-center h-100" id="card-mapa">
+            <div class="icon mb-2"><i class="bi bi-map"></i></div>
+            <h6 class="fw-bold mb-1">Mapa de Habitaciones</h6>
+            <p class="text-muted small mb-3">Equivalencias entre sistemas</p>
+            <div class="badge-cols mb-3 text-start">
+              HABITACIÓN &nbsp;|&nbsp; CAMPAMENTO<br>
+              MÓDULO &nbsp;|&nbsp; PISO &nbsp;|&nbsp; NM SALTO
+            </div>
+            <div id="label-mapa" class="text-muted small">
+              <i class="bi bi-upload me-1"></i>Haz clic para seleccionar
+            </div>
+          </div>
+        </label>
+        <input type="file" id="mapa" name="mapa" accept=".xlsx,.xls" onchange="marcarArchivo('mapa', this)" required>
+      </div>
+
+      <!-- Base El Salto -->
+      <div class="col-md-4">
+        <label for="salto" style="cursor:pointer; width:100%;">
+          <div class="card-file p-4 text-center h-100" id="card-salto">
+            <div class="icon mb-2"><i class="bi bi-door-open"></i></div>
+            <h6 class="fw-bold mb-1">Base de Datos El Salto</h6>
+            <p class="text-muted small mb-3">Control de acceso / puertas</p>
+            <div class="badge-cols mb-3 text-start">
+              FullName &nbsp;|&nbsp; ExtID<br>
+              DoorQty &nbsp;|&nbsp; ZoneQty<br>
+              NameDoorList
+            </div>
+            <div id="label-salto" class="text-muted small">
+              <i class="bi bi-upload me-1"></i>Haz clic para seleccionar
+            </div>
+          </div>
+        </label>
+        <input type="file" id="salto" name="salto" accept=".xlsx,.xls" onchange="marcarArchivo('salto', this)" required>
+      </div>
+
+      <!-- Base Hotelería -->
+      <div class="col-md-4">
+        <label for="hotel" style="cursor:pointer; width:100%;">
+          <div class="card-file p-4 text-center h-100" id="card-hotel">
+            <div class="icon mb-2"><i class="bi bi-house-door"></i></div>
+            <h6 class="fw-bold mb-1">Base de Datos Hotelería</h6>
+            <p class="text-muted small mb-3">Asignaciones actuales</p>
+            <div class="badge-cols mb-3 text-start">
+              HABITACIÓN &nbsp;|&nbsp; MÓDULO &nbsp;|&nbsp; RUT<br>
+              NOMBRE &nbsp;|&nbsp; EMPRESA<br>
+              N°CONTRATO &nbsp;|&nbsp; GERENCIA<br>
+              SISTEMA TURNO
+            </div>
+            <div id="label-hotel" class="text-muted small">
+              <i class="bi bi-upload me-1"></i>Haz clic para seleccionar
+            </div>
+          </div>
+        </label>
+        <input type="file" id="hotel" name="hotel" accept=".xlsx,.xls" onchange="marcarArchivo('hotel', this)" required>
+      </div>
+
+    </div><!-- /row -->
+
+    <!-- Cómo funciona -->
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:10px;">
+      <div class="card-body py-3 px-4">
+        <h6 class="fw-bold mb-2 text-secondary">
+          <i class="bi bi-info-circle me-1"></i>Cómo funciona el análisis
+        </h6>
+        <div class="row g-2 small text-muted">
+          <div class="col-md-3">
+            <i class="bi bi-1-circle text-primary me-1"></i>
+            El <strong>Mapa</strong> define la equivalencia entre el nombre de habitación en Hotelería y en El Salto.
+          </div>
+          <div class="col-md-3">
+            <i class="bi bi-2-circle text-primary me-1"></i>
+            Se <strong>cruza por RUT</strong> (usando <code>ExtID</code> de El Salto como RUT).
+          </div>
+          <div class="col-md-3">
+            <i class="bi bi-3-circle text-primary me-1"></i>
+            Se compara la habitación en Hotelería (traducida al formato El Salto) con la habitación asignada en El Salto.
+          </div>
+          <div class="col-md-3">
+            <i class="bi bi-4-circle text-primary me-1"></i>
+            Se reportan coincidencias, discrepancias y personas que aparecen solo en un sistema.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center">
+      <button type="submit" class="btn btn-procesar" id="btnProcesar" disabled>
+        <i class="bi bi-play-fill me-2"></i>Procesar y comparar
+      </button>
+      <p class="text-muted small mt-2">Selecciona los 3 archivos para habilitar el botón</p>
+    </div>
+
+  </form>
+</div><!-- /container -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+  const archivosSeleccionados = { mapa: false, salto: false, hotel: false };
+
+  function marcarArchivo(id, input) {
+    const card  = document.getElementById('card-' + id);
+    const label = document.getElementById('label-' + id);
+    if (input.files.length) {
+      const nombre = input.files[0].name;
+      const kb     = (input.files[0].size / 1024).toFixed(1);
+      card.classList.add('file-selected');
+      label.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1"></i><strong>${nombre}</strong><br><span class="text-muted">${kb} KB</span>`;
+      archivosSeleccionados[id] = true;
+    } else {
+      card.classList.remove('file-selected');
+      label.innerHTML = '<i class="bi bi-upload me-1"></i>Haz clic para seleccionar';
+      archivosSeleccionados[id] = false;
+    }
+    const todos = Object.values(archivosSeleccionados).every(Boolean);
+    document.getElementById('btnProcesar').disabled = !todos;
+  }
+
+  // Mostrar spinner al enviar
+  document.getElementById('uploadForm').addEventListener('submit', function () {
+    const btn = document.getElementById('btnProcesar');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+  });
+</script>
+</body>
+</html>
