@@ -8,117 +8,165 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
   <style>
     :root {
-      --azul-oscuro: #1F3864;
-      --azul-medio: #2E5FA3;
-      --azul-claro: #D6E4F7;
+      --rojo:        #C8102E;
+      --rojo-oscuro: #8B0000;
+      --rojo-claro:  #FDECEA;
     }
-    body { background: #F0F4FB; font-family: 'Segoe UI', sans-serif; }
+    body { background: #F2F2F2; font-family: 'Segoe UI', sans-serif; color: #1A1A1A; }
 
-    .navbar-brand { font-weight: 700; letter-spacing: 0.5px; }
-
-    .hero {
-      background: linear-gradient(135deg, var(--azul-oscuro) 0%, var(--azul-medio) 100%);
-      color: #fff;
-      padding: 2.5rem 0 1.5rem;
-    }
-    .hero h1 { font-size: 1.8rem; font-weight: 700; }
-    .hero p   { opacity: .85; }
-
-    .card-file {
-      border: 2px dashed #B0C4E0;
-      border-radius: 12px;
+    /* Navbar */
+    .navbar-top {
       background: #fff;
-      transition: border-color .2s, box-shadow .2s;
+      border-bottom: 3px solid var(--rojo);
+      padding: .65rem 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .logo-aramark { height: 36px; object-fit: contain; }
+    .nav-divider  { width:1px; height:36px; background:#ddd; margin:0 1rem; }
+    .nav-title    { font-weight:700; font-size:1rem; color:#1A1A1A; }
+    .nav-sub      { font-size:.82rem; color:#666; }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, var(--rojo-oscuro) 0%, var(--rojo) 100%);
+      color: #fff;
+      padding: 2.2rem 0 1.6rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content:''; position:absolute; right:-60px; top:-60px;
+      width:260px; height:260px;
+      background:rgba(255,255,255,.06); border-radius:50%;
+    }
+    .hero h1 { font-size:1.75rem; font-weight:700; }
+    .hero p  { opacity:.88; font-size:.95rem; }
+    .badge-hero {
+      background:rgba(255,255,255,.18); color:#fff;
+      border:1px solid rgba(255,255,255,.3);
+      font-size:.79rem; padding:3px 12px; border-radius:20px;
+    }
+
+    /* Cards archivo */
+    .card-file {
+      border: 2px dashed #D9B0B0;
+      border-radius: 14px;
+      background: #fff;
+      transition: border-color .2s, box-shadow .2s, transform .15s;
       cursor: pointer;
     }
-    .card-file:hover { border-color: var(--azul-medio); box-shadow: 0 4px 18px rgba(30,63,100,.12); }
-    .card-file .icon { font-size: 2.2rem; color: var(--azul-medio); }
+    .card-file:hover {
+      border-color: var(--rojo);
+      box-shadow: 0 6px 22px rgba(200,16,46,.13);
+      transform: translateY(-2px);
+    }
+    .card-file .icon { font-size:2.2rem; color:var(--rojo); }
     .card-file .badge-cols {
-      font-size: .72rem;
-      background: var(--azul-claro);
-      color: var(--azul-oscuro);
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-family: monospace;
+      font-size:.71rem;
+      background: var(--rojo-claro);
+      color: var(--rojo-oscuro);
+      border-radius:6px; padding:4px 9px;
+      font-family:monospace; line-height:1.75;
     }
+    .file-selected { border-color:#28a745 !important; background:#F0FFF4 !important; }
+    .file-selected .icon { color:#28a745 !important; }
+    input[type="file"] { display:none; }
 
-    .file-selected { border-color: #28a745 !important; background: #F0FFF4 !important; }
-    .file-selected .icon { color: #28a745 !important; }
-
-    input[type="file"] { display: none; }
-
+    /* Botón principal */
     .btn-procesar {
-      background: linear-gradient(90deg, var(--azul-oscuro), var(--azul-medio));
-      color: #fff;
-      border: none;
-      padding: .75rem 3rem;
-      font-size: 1.05rem;
-      border-radius: 8px;
-      font-weight: 600;
-      box-shadow: 0 4px 14px rgba(30,63,100,.3);
-      transition: opacity .2s;
+      background: linear-gradient(90deg, var(--rojo-oscuro), var(--rojo));
+      color:#fff; border:none;
+      padding:.75rem 3.2rem; font-size:1.05rem;
+      border-radius:8px; font-weight:600;
+      box-shadow:0 4px 16px rgba(200,16,46,.35);
+      transition: opacity .2s, transform .15s;
     }
-    .btn-procesar:hover { opacity: .9; color: #fff; }
-    .btn-procesar:disabled { opacity: .5; }
+    .btn-procesar:hover   { opacity:.92; color:#fff; transform:translateY(-1px); }
+    .btn-procesar:disabled { opacity:.45; transform:none; }
 
+    /* Info cards */
+    .info-card {
+      background:#fff; border-radius:12px; border:none;
+      box-shadow:0 2px 10px rgba(0,0,0,.07);
+    }
+    .info-card .card-body { padding:1.2rem 1.4rem; }
+
+    /* Badges */
+    .badge-guardado {
+      background:#e8f5e9; color:#2e7d32;
+      border:1px solid #a5d6a7; font-weight:600;
+    }
+
+    /* Alerta error */
     .alert-custom {
-      border-left: 4px solid #dc3545;
-      background: #fff5f5;
-      border-radius: 8px;
+      border-left:4px solid var(--rojo);
+      background:var(--rojo-claro); border-radius:8px;
+    }
+
+    /* Footer */
+    footer {
+      border-top:1px solid #ddd; padding:1rem 0;
+      font-size:.8rem; color:#999; text-align:center; margin-top:3rem;
     }
   </style>
 </head>
 <body>
 
 <!-- Navbar -->
-<nav class="navbar navbar-dark" style="background: var(--azul-oscuro);">
-  <div class="container">
-    <span class="navbar-brand">
-      <i class="bi bi-building me-2"></i>Comparador de Habitaciones
-    </span>
-    <span class="text-white-50 small">El Salto – Hotelería</span>
+<nav class="navbar-top">
+  <div class="container d-flex align-items-center">
+    <img src="/static/logo.png" alt="Aramark" class="logo-aramark"
+         onerror="this.style.display='none'">
+    <div class="nav-divider"></div>
+    <div>
+      <div class="nav-title"><i class="bi bi-building me-1"></i>El Salto – Hotelería</div>
+      <div class="nav-sub">Comparador de Asignaciones de Habitaciones</div>
+    </div>
   </div>
 </nav>
 
 <!-- Hero -->
 <div class="hero">
-  <div class="container">
-    <h1><i class="bi bi-arrow-left-right me-2"></i>Comparador de Asignaciones</h1>
+  <div class="container position-relative">
+    <span class="badge-hero mb-2 d-inline-block">
+      <i class="bi bi-shield-check me-1"></i>Control interno
+    </span>
+    <h1 class="mt-1"><i class="bi bi-arrow-left-right me-2"></i>Comparador de Asignaciones</h1>
     <p class="mb-0">
-      Carga los tres archivos exportados directamente desde el sistema para detectar
-      discrepancias de habitaciones entre <strong>El Salto</strong> y <strong>Hotelería</strong>.
+      Carga los archivos exportados desde el sistema para detectar discrepancias
+      entre <strong>El Salto</strong> y <strong>Hotelería</strong>.
     </p>
   </div>
 </div>
 
-<!-- Main -->
+<!-- Contenido -->
 <div class="container py-4">
 
   {% if error %}
   <div class="alert alert-custom d-flex align-items-start gap-2 mb-4">
-    <i class="bi bi-exclamation-triangle-fill text-danger mt-1"></i>
+    <i class="bi bi-exclamation-triangle-fill text-danger mt-1 fs-5"></i>
     <div>
       <strong>Error al procesar</strong>
-      <pre class="mb-0 mt-1" style="font-size:.85rem;">{{ error }}</pre>
+      <pre class="mb-0 mt-1" style="font-size:.83rem;">{{ error }}</pre>
     </div>
   </div>
   {% endif %}
 
   {% if ok_mapa %}
   <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
-    <i class="bi bi-check-circle-fill"></i> {{ ok_mapa }}
+    <i class="bi bi-check-circle-fill fs-5"></i> {{ ok_mapa }}
   </div>
   {% endif %}
 
-  <!-- ── Mapa de habitaciones (guardado en BD) ──────────── -->
-  <div class="card border-0 shadow-sm mb-4" style="border-radius:10px;">
-    <div class="card-body py-3 px-4">
+  <!-- Mapa de habitaciones -->
+  <div class="info-card mb-4">
+    <div class="card-body">
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
         <div>
-          <h6 class="fw-bold mb-1" style="color:var(--azul-oscuro);">
+          <h6 class="fw-bold mb-1" style="color:var(--rojo-oscuro);">
             <i class="bi bi-map me-2"></i>Mapa de Habitaciones
             {% if mapa_cargado %}
-              <span class="badge bg-success ms-1">Guardado en base de datos</span>
+              <span class="badge badge-guardado ms-1">Guardado en base de datos</span>
             {% else %}
               <span class="badge bg-warning text-dark ms-1">No cargado</span>
             {% endif %}
@@ -126,7 +174,7 @@
           {% if mapa_cargado %}
             <p class="text-muted small mb-0">
               <i class="bi bi-clock me-1"></i>Última actualización: <strong>{{ mapa_fecha }}</strong>.
-              El mapa se reutiliza automáticamente en cada comparación.
+              Se reutiliza automáticamente en cada comparación.
             </p>
           {% else %}
             <p class="text-muted small mb-0">
@@ -154,7 +202,7 @@
         <div class="input-group" style="max-width:420px;">
           <input type="file" name="mapa" class="form-control form-control-sm"
                  accept=".xlsx,.xls" required>
-          <button class="btn btn-primary btn-sm" type="submit">
+          <button class="btn btn-sm text-white" style="background:var(--rojo);" type="submit">
             <i class="bi bi-cloud-upload me-1"></i>Guardar mapa
           </button>
         </div>
@@ -168,7 +216,7 @@
           <div class="input-group" style="max-width:420px;">
             <input type="file" name="mapa" class="form-control form-control-sm"
                    accept=".xlsx,.xls" required>
-            <button class="btn btn-outline-primary btn-sm" type="submit">
+            <button class="btn btn-sm btn-outline-danger" type="submit">
               <i class="bi bi-cloud-upload me-1"></i>Actualizar
             </button>
           </div>
@@ -178,25 +226,26 @@
     </div>
   </div>
 
-  <!-- ── Descarga de Plantillas ─────────────────────────── -->
-  <div class="card border-0 shadow-sm mb-4" style="border-radius:10px; background:linear-gradient(135deg,#f8f9ff,#eef3ff);">
-    <div class="card-body py-3 px-4">
-      <h6 class="fw-bold mb-1" style="color:var(--azul-oscuro);">
+  <!-- Plantillas -->
+  <div class="info-card mb-4" style="background:linear-gradient(135deg,#fff5f5,#fff);">
+    <div class="card-body">
+      <h6 class="fw-bold mb-1" style="color:var(--rojo-oscuro);">
         <i class="bi bi-file-earmark-arrow-down me-2"></i>Plantillas de datos
       </h6>
-      <p class="text-muted small mb-2">Descarga, rellena y luego sube abajo.</p>
+      <p class="text-muted small mb-2">Descarga, rellena y luego sube abajo para comparar.</p>
       <div class="d-flex flex-wrap gap-2">
-        <a href="/plantilla/salto" class="btn btn-sm btn-outline-success">
+        <a href="/plantilla/salto" class="btn btn-sm btn-outline-danger">
           <i class="bi bi-download me-1"></i>Plantilla Base El Salto
         </a>
-        <a href="/plantilla/hotel" class="btn btn-sm btn-outline-warning">
+        <a href="/plantilla/hotel" class="btn btn-sm"
+           style="border:1px solid #e67e22; color:#e67e22;">
           <i class="bi bi-download me-1"></i>Plantilla Base Hotelería
         </a>
       </div>
     </div>
   </div>
 
-  <h6 class="fw-bold mb-3" style="color:var(--azul-oscuro);">
+  <h6 class="fw-bold mb-3" style="color:var(--rojo-oscuro);">
     <i class="bi bi-cloud-upload me-2"></i>Comparar — Sube los archivos
   </h6>
 
@@ -204,14 +253,14 @@
 
     <div class="row g-3 mb-4">
 
-      <!-- Mapa de Habitaciones -->
+      <!-- Mapa -->
       <div class="col-md-4">
         <label for="mapa" style="cursor:pointer; width:100%;">
           <div class="card-file p-4 text-center h-100" id="card-mapa">
             <div class="icon mb-2"><i class="bi bi-map"></i></div>
             <h6 class="fw-bold mb-1">Mapa de Habitaciones</h6>
             {% if mapa_cargado %}
-              <span class="badge bg-success mb-2">Guardado en BD</span>
+              <span class="badge badge-guardado mb-2">Guardado en BD</span>
               <p class="text-muted small mb-3">Usa el guardado o sube uno nuevo para reemplazarlo.</p>
             {% else %}
               <p class="text-muted small mb-3">Equivalencias entre sistemas</p>
@@ -234,7 +283,7 @@
                {% if not mapa_cargado %}required{% endif %}>
       </div>
 
-      <!-- Base El Salto -->
+      <!-- El Salto -->
       <div class="col-md-4">
         <label for="salto" style="cursor:pointer; width:100%;">
           <div class="card-file p-4 text-center h-100" id="card-salto">
@@ -251,10 +300,11 @@
             </div>
           </div>
         </label>
-        <input type="file" id="salto" name="salto" accept=".xlsx,.xls" onchange="marcarArchivo('salto', this)" required>
+        <input type="file" id="salto" name="salto" accept=".xlsx,.xls"
+               onchange="marcarArchivo('salto', this)" required>
       </div>
 
-      <!-- Base Hotelería -->
+      <!-- Hotelería -->
       <div class="col-md-4">
         <label for="hotel" style="cursor:pointer; width:100%;">
           <div class="card-file p-4 text-center h-100" id="card-hotel">
@@ -272,33 +322,34 @@
             </div>
           </div>
         </label>
-        <input type="file" id="hotel" name="hotel" accept=".xlsx,.xls" onchange="marcarArchivo('hotel', this)" required>
+        <input type="file" id="hotel" name="hotel" accept=".xlsx,.xls"
+               onchange="marcarArchivo('hotel', this)" required>
       </div>
 
-    </div><!-- /row -->
+    </div>
 
     <!-- Cómo funciona -->
-    <div class="card border-0 shadow-sm mb-4" style="border-radius:10px;">
-      <div class="card-body py-3 px-4">
-        <h6 class="fw-bold mb-2 text-secondary">
+    <div class="info-card mb-4">
+      <div class="card-body">
+        <h6 class="fw-bold mb-2" style="color:#666;">
           <i class="bi bi-info-circle me-1"></i>Cómo funciona el análisis
         </h6>
         <div class="row g-2 small text-muted">
           <div class="col-md-3">
-            <i class="bi bi-1-circle text-primary me-1"></i>
+            <i class="bi bi-1-circle me-1" style="color:var(--rojo);"></i>
             El <strong>Mapa</strong> define la equivalencia entre el nombre de habitación en Hotelería y en El Salto.
           </div>
           <div class="col-md-3">
-            <i class="bi bi-2-circle text-primary me-1"></i>
+            <i class="bi bi-2-circle me-1" style="color:var(--rojo);"></i>
             Se <strong>cruza por RUT</strong> (usando <code>ExtID</code> de El Salto como RUT).
           </div>
           <div class="col-md-3">
-            <i class="bi bi-3-circle text-primary me-1"></i>
-            Se compara la habitación en Hotelería (traducida al formato El Salto) con la habitación asignada en El Salto.
+            <i class="bi bi-3-circle me-1" style="color:var(--rojo);"></i>
+            Se compara la habitación en Hotelería (traducida) con la asignada en El Salto.
           </div>
           <div class="col-md-3">
-            <i class="bi bi-4-circle text-primary me-1"></i>
-            Se reportan coincidencias, discrepancias y personas que aparecen solo en un sistema.
+            <i class="bi bi-4-circle me-1" style="color:var(--rojo);"></i>
+            Se reportan coincidencias, discrepancias y personas solo en un sistema.
           </div>
         </div>
       </div>
@@ -312,11 +363,18 @@
     </div>
 
   </form>
-</div><!-- /container -->
+</div>
+
+<footer>
+  <div class="container">
+    <img src="/static/logo.png" alt="Aramark"
+         style="height:22px; opacity:.4; margin-bottom:4px;" onerror="this.style.display='none'">
+    <div>© 2025 Aramark · El Salto – Herramienta interna de control hotelero</div>
+  </div>
+</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
-  // Si el mapa ya está guardado en BD, no es obligatorio seleccionarlo
   const mapaGuardado = {{ 'true' if mapa_cargado else 'false' }};
   const archivosSeleccionados = { mapa: mapaGuardado, salto: false, hotel: false };
 
@@ -331,7 +389,6 @@
       archivosSeleccionados[id] = true;
     } else {
       card.classList.remove('file-selected');
-      // Si es mapa y ya estaba guardado, vuelve a estar OK
       const esMapaGuardado = (id === 'mapa' && mapaGuardado);
       label.innerHTML = esMapaGuardado
         ? '<i class="bi bi-check-circle-fill text-success me-1"></i>Clic para cambiar'
