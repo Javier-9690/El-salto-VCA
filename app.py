@@ -403,7 +403,7 @@ def _calcular_resumen_ejecutivo(df_sal, df_hot, df_map,
 
     def get_camp_hot(rut):
         h_row = hot_idx.get(rut)
-        if not h_row:
+        if h_row is None:
             return 'Sin mapa'
         hab = limpiar(h_row.get(hot_hab, '')).upper() if hot_hab else ''
         return hab_to_camp.get(hab, 'Sin mapa')
