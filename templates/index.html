@@ -230,13 +230,13 @@
   <div class="info-card mb-4" style="background:linear-gradient(135deg,#fff5f5,#fff);">
     <div class="card-body">
       <h6 class="fw-bold mb-1" style="color:var(--rojo-oscuro);">
-        <i class="bi bi-file-earmark-arrow-down me-2"></i>Plantillas de datos
+        <i class="bi bi-file-earmark-arrow-down me-2"></i>Plantilla de datos
       </h6>
-      <p class="text-muted small mb-2">Descarga, rellena y luego sube abajo para comparar.</p>
+      <p class="text-muted small mb-2">
+        El archivo de El Salto se exporta directamente desde el sistema de control de acceso
+        (<code>exportacionusuarios.csv</code>). Solo necesitas la plantilla de Hotelería.
+      </p>
       <div class="d-flex flex-wrap gap-2">
-        <a href="/plantilla/salto" class="btn btn-sm btn-outline-danger">
-          <i class="bi bi-download me-1"></i>Plantilla Base El Salto
-        </a>
         <a href="/plantilla/hotel" class="btn btn-sm"
            style="border:1px solid #e67e22; color:#e67e22;">
           <i class="bi bi-download me-1"></i>Plantilla Base Hotelería
@@ -288,19 +288,23 @@
         <label for="salto" style="cursor:pointer; width:100%;">
           <div class="card-file p-4 text-center h-100" id="card-salto">
             <div class="icon mb-2"><i class="bi bi-door-open"></i></div>
-            <h6 class="fw-bold mb-1">Base de Datos El Salto</h6>
-            <p class="text-muted small mb-3">Control de acceso / puertas</p>
+            <h6 class="fw-bold mb-1">Exportación El Salto</h6>
+            <p class="text-muted small mb-3">CSV exportado desde el sistema de acceso</p>
             <div class="badge-cols mb-3 text-start">
-              FullName &nbsp;|&nbsp; ExtID<br>
-              DoorQty &nbsp;|&nbsp; ZoneQty<br>
-              NameDoorList
+              ExtID &nbsp;|&nbsp; FirstName<br>
+              CalendarID &nbsp;|&nbsp; CurrentKeyStatus<br>
+              ExtDoorIDList
+            </div>
+            <div class="text-muted" style="font-size:.7rem; margin-bottom:.6rem;">
+              <i class="bi bi-filetype-csv me-1" style="color:var(--rojo);"></i>
+              Archivo: <code>exportacionusuarios.csv</code>
             </div>
             <div id="label-salto" class="text-muted small">
               <i class="bi bi-upload me-1"></i>Haz clic para seleccionar
             </div>
           </div>
         </label>
-        <input type="file" id="salto" name="salto" accept=".xlsx,.xls"
+        <input type="file" id="salto" name="salto" accept=".csv"
                onchange="marcarArchivo('salto', this)" required>
       </div>
 
@@ -341,15 +345,15 @@
           </div>
           <div class="col-md-3">
             <i class="bi bi-2-circle me-1" style="color:var(--rojo);"></i>
-            Se <strong>cruza por RUT</strong> (usando <code>ExtID</code> de El Salto como RUT).
+            El CSV de El Salto se <strong>normaliza</strong> usando las tablas de Horario, Calendario y Estado de Llave.
           </div>
           <div class="col-md-3">
             <i class="bi bi-3-circle me-1" style="color:var(--rojo);"></i>
-            Se compara la habitación en Hotelería (traducida) con la asignada en El Salto.
+            Se <strong>cruza por RUT</strong> (<code>ExtID</code>) y se compara la habitación asignada en ambos sistemas.
           </div>
           <div class="col-md-3">
             <i class="bi bi-4-circle me-1" style="color:var(--rojo);"></i>
-            Se reportan coincidencias, discrepancias y personas solo en un sistema.
+            Se reportan discrepancias, coincidencias, y usuarios <strong>sin calendario</strong> o <strong>sin tabla horario</strong>.
           </div>
         </div>
       </div>
