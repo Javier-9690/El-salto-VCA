@@ -373,27 +373,27 @@ def _calcular_resumen_ejecutivo(df_sal, df_hot, df_map,
                                 hot_hab, hot_mod,
                                 map_nm, map_hab, map_camp):
     """
-    Calcula el resumen ejecutivo por campamento (similar al cuadro de gestión).
+    Calcula el resumen ejecutivo por campamento — versión vectorizada (pandas).
     Retorna una lista de dicts, uno por campamento + fila TOTAL si hay más de uno.
     """
-    invalid_cal  = ('No válido', 'No válida', 'Desconocido', '')
-    invalid_hor  = ('No válida', 'Desconocido', '')
-    needs_update = ('Actualización requerida', 'Reedición requerida', 'Llave expirada')
+    invalid_cal  = frozenset(('No válido', 'No válida', 'Desconocido', ''))
+    invalid_hor  = frozenset(('No válida', 'Desconocido', ''))
+    needs_update = frozenset(('Actualización requerida', 'Reedición requerida', 'Llave expirada'))
+    hot_ruts_set = frozenset(hot_idx.keys())
+    comunes_set  = frozenset(comunes)
 
     def pct(n, d):
         return round(n / d * 100) if d else 0
 
-    # ── Mapas campamento ──────────────────────────────────────────
-    hab_to_camp  = {}   # HABITACIÓN (upper) → campamento
-    door_to_camp = {}   # NM SALTO (upper)   → campamento
-
+    # ── Mapas campamento (sólo el mapa es pequeño, iterrows OK) ──
+    hab_to_camp  = {}
+    door_to_camp = {}
     if map_hab and map_camp:
         for _, f in df_map.iterrows():
             h = limpiar(f.get(map_hab, '')).upper()
             c = limpiar(f.get(map_camp, ''))
             if h and c:
                 hab_to_camp[h] = c
-
     if map_nm and map_camp:
         for _, f in df_map.iterrows():
             n = limpiar(f.get(map_nm, '')).upper()
@@ -401,63 +401,56 @@ def _calcular_resumen_ejecutivo(df_sal, df_hot, df_map,
             if n and c:
                 door_to_camp[n] = c
 
-    def get_camp_hot(rut):
-        h_row = hot_idx.get(rut)
-        if h_row is None:
-            return 'Sin mapa'
-        hab = limpiar(h_row.get(hot_hab, '')).upper() if hot_hab else ''
-        return hab_to_camp.get(hab, 'Sin mapa')
+    # ── Series de campamento (vectorizado, sin iterrows sobre CSV) ─
+    if door_to_camp:
+        sal_camp_s = (df_sal['NameDoorList'].fillna('').str.upper()
+                      .map(door_to_camp).fillna('Sin mapa'))
+    else:
+        sal_camp_s = pd.Series('VCA', index=df_sal.index)
 
-    def get_camp_sal(row):
-        door = limpiar(row.get('NameDoorList', '')).upper()
-        return door_to_camp.get(door, 'Sin mapa')
+    if hab_to_camp and hot_hab:
+        hot_camp_s = (df_hot[hot_hab].fillna('').str.upper()
+                      .map(hab_to_camp).fillna('Sin mapa'))
+    else:
+        hot_camp_s = pd.Series('VCA', index=df_hot.index)
+
+    # ── Boolean Series sobre df_sal (una sola pasada, vectorizado) ─
+    sal_tiene_hab = df_sal['NameDoorList'].fillna('') != ''
+    sal_tiene_cal = ~df_sal['TipoCalendario'].fillna('').isin(invalid_cal)
+    sal_tiene_hor = ~df_sal['ClasifTablaHorario'].fillna('').isin(invalid_hor)
+    sal_en_hot    = df_sal['_RUT'].isin(hot_ruts_set)
+    sal_en_comun  = df_sal['_RUT'].isin(comunes_set)
+    sal_act       = df_sal['EstadoLlave'].fillna('').isin(needs_update)
+    sal_con_todo  = sal_tiene_hab & sal_tiene_cal & sal_tiene_hor
 
     # ── Determinar campamentos ────────────────────────────────────
     all_camps = sorted(
-        {c for c in list(hab_to_camp.values()) + list(door_to_camp.values()) if c}
-    )
-    if not all_camps:
-        all_camps = ['VCA']      # valor por defecto si el mapa no tiene CAMPAMENTO
+        set(list(hab_to_camp.values()) + list(door_to_camp.values())) - {''} - {'Sin mapa'}
+    ) or ['VCA']
 
     filas = []
     for camp in all_camps:
+        sal_mask = sal_camp_s == camp
+        hot_mask = hot_camp_s == camp
 
-        # ── SALTO: usuarios cuya puerta pertenece a este campamento ──
-        if door_to_camp:
-            sal_camp = [r for _, r in df_sal.iterrows() if get_camp_sal(r) == camp]
-        else:
-            sal_camp = [r for _, r in df_sal.iterrows()]   # todos si no hay mapa camp
+        # SALTO side — todo vectorizado
+        sal_total   = int(sal_mask.sum())
+        sal_con_hab = int((sal_mask & sal_tiene_hab).sum())
+        sal_con_cal = int((sal_mask & sal_tiene_cal).sum())
+        sal_con_hor = int((sal_mask & sal_tiene_hor).sum())
+        visitas     = int((sal_mask & ~sal_en_hot).sum())
 
-        sal_total    = len(sal_camp)
-        sal_con_hab  = sum(1 for r in sal_camp if limpiar(r.get('NameDoorList',   '')) != '')
-        sal_con_cal  = sum(1 for r in sal_camp
-                           if limpiar(r.get('TipoCalendario',    '')) not in invalid_cal)
-        sal_con_hor  = sum(1 for r in sal_camp
-                           if limpiar(r.get('ClasifTablaHorario','')) not in invalid_hor)
-        # Sobrantes = en Salto pero NO en Hotelería (visitas)
-        visitas = sum(1 for r in sal_camp
-                      if norm_rut(r.get('ExtID', '')) not in hot_idx)
+        # HOTELERÍA side
+        hot_total     = int(hot_mask.sum())
+        hot_camp_ruts = frozenset(df_hot.loc[hot_mask, '_RUT'])
+        hot_comunes_n = len(hot_camp_ruts & comunes_set)
 
-        # ── HOTELERÍA: usuarios cuya habitación pertenece a este campamento ──
-        if hab_to_camp:
-            hot_camp_ruts = {rut for rut in hot_idx if get_camp_hot(rut) == camp}
-        else:
-            hot_camp_ruts = set(hot_idx.keys())
-
-        hot_total    = len(hot_camp_ruts)
-        hot_comunes  = hot_camp_ruts & set(sal_idx)   # en ambas bases
-        hot_comunes_n = len(hot_comunes)
-
-        hot_con_cal = hot_con_hor = hot_con_todo = hot_act = 0
-        for rut in hot_comunes:
-            row      = sal_idx[rut]
-            tiene_hab = limpiar(row.get('NameDoorList',    '')) != ''
-            tiene_cal = limpiar(row.get('TipoCalendario',  '')) not in invalid_cal
-            tiene_hor = limpiar(row.get('ClasifTablaHorario','')) not in invalid_hor
-            if tiene_cal:                      hot_con_cal  += 1
-            if tiene_hor:                      hot_con_hor  += 1
-            if tiene_hab and tiene_cal and tiene_hor: hot_con_todo += 1
-            if limpiar(row.get('EstadoLlave','')) in needs_update: hot_act += 1
+        # Métricas sobre comunes de este campamento (vectorizado)
+        com_mask     = sal_mask & sal_en_comun & df_sal['_RUT'].isin(hot_camp_ruts)
+        hot_con_cal  = int((com_mask & sal_tiene_cal).sum())
+        hot_con_hor  = int((com_mask & sal_tiene_hor).sum())
+        hot_con_todo = int((com_mask & sal_con_todo).sum())
+        hot_act      = int((com_mask & sal_act).sum())
 
         filas.append({
             'Campamento':            camp,
