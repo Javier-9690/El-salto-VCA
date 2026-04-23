@@ -133,6 +133,45 @@
       border-top:1px solid #ddd; padding:1rem 0;
       font-size:.8rem; color:#999; text-align:center; margin-top:3rem;
     }
+
+    /* ── Tabla Resumen Ejecutivo ── */
+    .resumen-exec { font-size: .78rem; white-space: nowrap; }
+    .resumen-exec th, .resumen-exec td { text-align: center; vertical-align: middle; padding: 5px 8px; }
+
+    /* Headers sección */
+    .res-camp-hdr { background: #1A1A2E !important; color:#fff; font-weight:700; }
+    .res-sal-hdr  { background: #2F6496 !important; color:#fff; font-weight:700; font-size:.82rem; letter-spacing:.04em; }
+    .res-hot-hdr  { background: #C55A11 !important; color:#fff; font-weight:700; font-size:.82rem; letter-spacing:.04em; }
+
+    /* Headers columna */
+    .res-sal      { background: #4472C4 !important; color:#fff; font-weight:600; }
+    .res-vis      { background: #2F75B6 !important; color:#fff; font-weight:600; }
+    .res-hot      { background: #ED7D31 !important; color:#fff; font-weight:600; }
+    .res-pct      { background: #F4B183 !important; color:#fff; font-weight:600; }
+    .res-todo     { background: #922B21 !important; color:#fff; font-weight:600; }
+    .res-todo-pct { background: #C0392B !important; color:#fff; font-weight:600; }
+    .res-act      { background: #7F7F7F !important; color:#fff; font-weight:600; }
+    .res-act-pct  { background: #A6A6A6 !important; color:#fff; font-weight:600; }
+
+    /* Celdas de datos */
+    .res-camp-cell  { background: #1A1A2E; color:#fff; font-weight:700; text-align:left; white-space:nowrap; }
+    .res-sal-data   { background: #D6E4F0; font-weight:600; }
+    .res-vis-data   { background: #AED6F1; font-weight:700; color:#154360; font-size:.75rem; }
+    .res-hot-data   { background: #FDEBD0; font-weight:600; }
+    .res-pct-data   { font-weight:700; font-size:.82rem; }
+    .res-todo-data  { background: #FADBD8; font-weight:700; color:#7B241C; }
+    .res-todo-pct-data { font-weight:700; font-size:.82rem; }
+    .res-act-data   { background: #EAECEE; font-weight:600; }
+    .res-act-pct-data  { font-weight:700; font-size:.82rem; }
+
+    /* Semáforo en % */
+    .pct-green  { background: #D5F5E3 !important; color: #1E8449; }
+    .pct-yellow { background: #FDEBD0 !important; color: #7D6608; }
+    .pct-red    { background: #FADBD8 !important; color: #922B21; }
+
+    /* Fila TOTAL */
+    .res-total-row td { border-top: 2px solid #333 !important; background: #F0F3F4 !important; font-weight:700; color:#1A1A1A; }
+    .res-total-row .res-camp-cell { background: #2C3E50 !important; color:#fff; }
   </style>
 </head>
 <body>
@@ -221,6 +260,76 @@
       <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e74c3c;margin-right:4px;vertical-align:middle;"></span>&lt; 70% Crítico</span>
     </div>
   </div>
+
+  {# ──────────────────────────────────────────────── #}
+  {# TABLA RESUMEN EJECUTIVO POR CAMPAMENTO          #}
+  {# ──────────────────────────────────────────────── #}
+
+  {% if results.resumen_ejecutivo %}
+  <div class="dashboard-card mb-4">
+    <div class="dashboard-title">
+      <i class="bi bi-table me-2"></i>Resumen Ejecutivo por Campamento
+      <span class="float-end" style="font-size:.72rem; font-weight:400; text-transform:none; letter-spacing:0; color:#888;">
+        Usuarios sobrantes en El Salto = no están en Hotelería (visitas)
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm mb-0 resumen-exec">
+        <thead>
+          <!-- Fila 1: secciones -->
+          <tr>
+            <th rowspan="2" class="res-camp-hdr">Campamento</th>
+            <th colspan="5" class="res-sal-hdr">SALTO</th>
+            <th colspan="11" class="res-hot-hdr">BBDD Hotelería</th>
+          </tr>
+          <!-- Fila 2: columnas -->
+          <tr>
+            <th class="res-sal">Total<br>Usuarios</th>
+            <th class="res-sal">Con 1 Hab.<br>Asignada</th>
+            <th class="res-sal">Con Calendario<br>Asignado</th>
+            <th class="res-sal">Con Tabla<br>Horario Asignada</th>
+            <th class="res-vis">Sobrantes<br>(Visitas)</th>
+            <th class="res-hot">Total<br>Usuarios</th>
+            <th class="res-hot">Con 1 Hab.<br>en Salto</th>
+            <th class="res-pct">%<br>Asig. Hab.</th>
+            <th class="res-hot">Con Calendario<br>Asignado</th>
+            <th class="res-pct">%<br>Asig. Cal.</th>
+            <th class="res-hot">Con Tabla<br>Horario</th>
+            <th class="res-pct">%<br>Asig. Hor.</th>
+            <th class="res-todo">Con Hab.+Cal.<br>+Tabla Hor.</th>
+            <th class="res-todo-pct">%<br>Avance Real</th>
+            <th class="res-act">Total Act.<br>Tarjetas</th>
+            <th class="res-act-pct">%<br>Act. Tarjetas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in results.resumen_ejecutivo %}
+          {% set es_total = fila.Campamento == 'TOTAL' %}
+          <tr class="{{ 'res-total-row' if es_total else '' }}">
+            <td class="res-camp-cell">{{ fila.Campamento }}</td>
+            <td class="res-sal-data">{{ "{:,}".format(fila['SAL_Total']) }}</td>
+            <td class="res-sal-data">{{ "{:,}".format(fila['SAL_Con Hab']) }}</td>
+            <td class="res-sal-data">{{ "{:,}".format(fila['SAL_Con Calendario']) }}</td>
+            <td class="res-sal-data">{{ "{:,}".format(fila['SAL_Con Tabla Horario']) }}</td>
+            <td class="res-vis-data">{{ "{:,}".format(fila['SAL_Visitas']) }}<br><small>(visitas)</small></td>
+            <td class="res-hot-data">{{ "{:,}".format(fila['HOT_Total']) }}</td>
+            <td class="res-hot-data">{{ "{:,}".format(fila['HOT_Con Hab en Salto']) }}</td>
+            <td class="res-pct-data {% if fila['HOT_pct_Hab'] >= 90 %}pct-green{% elif fila['HOT_pct_Hab'] >= 70 %}pct-yellow{% else %}pct-red{% endif %}">{{ fila['HOT_pct_Hab'] }}%</td>
+            <td class="res-hot-data">{{ "{:,}".format(fila['HOT_Con Calendario']) }}</td>
+            <td class="res-pct-data {% if fila['HOT_pct_Cal'] >= 90 %}pct-green{% elif fila['HOT_pct_Cal'] >= 70 %}pct-yellow{% else %}pct-red{% endif %}">{{ fila['HOT_pct_Cal'] }}%</td>
+            <td class="res-hot-data">{{ "{:,}".format(fila['HOT_Con Tabla Horario']) }}</td>
+            <td class="res-pct-data {% if fila['HOT_pct_Hor'] >= 90 %}pct-green{% elif fila['HOT_pct_Hor'] >= 70 %}pct-yellow{% else %}pct-red{% endif %}">{{ fila['HOT_pct_Hor'] }}%</td>
+            <td class="res-todo-data">{{ "{:,}".format(fila['HOT_Con Todo']) }}</td>
+            <td class="res-todo-pct-data {% if fila['HOT_pct_Todo'] >= 90 %}pct-green{% elif fila['HOT_pct_Todo'] >= 70 %}pct-yellow{% else %}pct-red{% endif %}">{{ fila['HOT_pct_Todo'] }}%</td>
+            <td class="res-act-data">{{ "{:,}".format(fila['HOT_Act Tarjetas']) }}</td>
+            <td class="res-act-pct-data {% if fila['HOT_pct_Act'] >= 90 %}pct-green{% elif fila['HOT_pct_Act'] >= 70 %}pct-yellow{% else %}pct-red{% endif %}">{{ fila['HOT_pct_Act'] }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   {# ──────────────────────────────────────────────── #}
   {# TARJETAS DE RESUMEN NUMÉRICO                    #}
