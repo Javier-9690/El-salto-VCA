@@ -368,6 +368,135 @@ def leer_csv_salto(data_bytes):
 #  Procesamiento principal
 # ─────────────────────────────────────────────
 
+def _calcular_resumen_ejecutivo(df_sal, df_hot, df_map,
+                                sal_idx, hot_idx, comunes,
+                                hot_hab, hot_mod,
+                                map_nm, map_hab, map_camp):
+    """
+    Calcula el resumen ejecutivo por campamento (similar al cuadro de gestión).
+    Retorna una lista de dicts, uno por campamento + fila TOTAL si hay más de uno.
+    """
+    invalid_cal  = ('No válido', 'No válida', 'Desconocido', '')
+    invalid_hor  = ('No válida', 'Desconocido', '')
+    needs_update = ('Actualización requerida', 'Reedición requerida', 'Llave expirada')
+
+    def pct(n, d):
+        return round(n / d * 100) if d else 0
+
+    # ── Mapas campamento ──────────────────────────────────────────
+    hab_to_camp  = {}   # HABITACIÓN (upper) → campamento
+    door_to_camp = {}   # NM SALTO (upper)   → campamento
+
+    if map_hab and map_camp:
+        for _, f in df_map.iterrows():
+            h = limpiar(f.get(map_hab, '')).upper()
+            c = limpiar(f.get(map_camp, ''))
+            if h and c:
+                hab_to_camp[h] = c
+
+    if map_nm and map_camp:
+        for _, f in df_map.iterrows():
+            n = limpiar(f.get(map_nm, '')).upper()
+            c = limpiar(f.get(map_camp, ''))
+            if n and c:
+                door_to_camp[n] = c
+
+    def get_camp_hot(rut):
+        h_row = hot_idx.get(rut)
+        if not h_row:
+            return 'Sin mapa'
+        hab = limpiar(h_row.get(hot_hab, '')).upper() if hot_hab else ''
+        return hab_to_camp.get(hab, 'Sin mapa')
+
+    def get_camp_sal(row):
+        door = limpiar(row.get('NameDoorList', '')).upper()
+        return door_to_camp.get(door, 'Sin mapa')
+
+    # ── Determinar campamentos ────────────────────────────────────
+    all_camps = sorted(
+        {c for c in list(hab_to_camp.values()) + list(door_to_camp.values()) if c}
+    )
+    if not all_camps:
+        all_camps = ['VCA']      # valor por defecto si el mapa no tiene CAMPAMENTO
+
+    filas = []
+    for camp in all_camps:
+
+        # ── SALTO: usuarios cuya puerta pertenece a este campamento ──
+        if door_to_camp:
+            sal_camp = [r for _, r in df_sal.iterrows() if get_camp_sal(r) == camp]
+        else:
+            sal_camp = [r for _, r in df_sal.iterrows()]   # todos si no hay mapa camp
+
+        sal_total    = len(sal_camp)
+        sal_con_hab  = sum(1 for r in sal_camp if limpiar(r.get('NameDoorList',   '')) != '')
+        sal_con_cal  = sum(1 for r in sal_camp
+                           if limpiar(r.get('TipoCalendario',    '')) not in invalid_cal)
+        sal_con_hor  = sum(1 for r in sal_camp
+                           if limpiar(r.get('ClasifTablaHorario','')) not in invalid_hor)
+        # Sobrantes = en Salto pero NO en Hotelería (visitas)
+        visitas = sum(1 for r in sal_camp
+                      if norm_rut(r.get('ExtID', '')) not in hot_idx)
+
+        # ── HOTELERÍA: usuarios cuya habitación pertenece a este campamento ──
+        if hab_to_camp:
+            hot_camp_ruts = {rut for rut in hot_idx if get_camp_hot(rut) == camp}
+        else:
+            hot_camp_ruts = set(hot_idx.keys())
+
+        hot_total    = len(hot_camp_ruts)
+        hot_comunes  = hot_camp_ruts & set(sal_idx)   # en ambas bases
+        hot_comunes_n = len(hot_comunes)
+
+        hot_con_cal = hot_con_hor = hot_con_todo = hot_act = 0
+        for rut in hot_comunes:
+            row      = sal_idx[rut]
+            tiene_hab = limpiar(row.get('NameDoorList',    '')) != ''
+            tiene_cal = limpiar(row.get('TipoCalendario',  '')) not in invalid_cal
+            tiene_hor = limpiar(row.get('ClasifTablaHorario','')) not in invalid_hor
+            if tiene_cal:                      hot_con_cal  += 1
+            if tiene_hor:                      hot_con_hor  += 1
+            if tiene_hab and tiene_cal and tiene_hor: hot_con_todo += 1
+            if limpiar(row.get('EstadoLlave','')) in needs_update: hot_act += 1
+
+        filas.append({
+            'Campamento':            camp,
+            # SALTO
+            'SAL_Total':             sal_total,
+            'SAL_Con Hab':           sal_con_hab,
+            'SAL_Con Calendario':    sal_con_cal,
+            'SAL_Con Tabla Horario': sal_con_hor,
+            'SAL_Visitas':           visitas,
+            # HOTELERÍA
+            'HOT_Total':             hot_total,
+            'HOT_Con Hab en Salto':  hot_comunes_n,
+            'HOT_pct_Hab':           pct(hot_comunes_n, hot_total),
+            'HOT_Con Calendario':    hot_con_cal,
+            'HOT_pct_Cal':           pct(hot_con_cal,   hot_total),
+            'HOT_Con Tabla Horario': hot_con_hor,
+            'HOT_pct_Hor':           pct(hot_con_hor,   hot_total),
+            'HOT_Con Todo':          hot_con_todo,
+            'HOT_pct_Todo':          pct(hot_con_todo,  hot_total),
+            'HOT_Act Tarjetas':      hot_act,
+            'HOT_pct_Act':           pct(hot_act,       hot_total),
+        })
+
+    # ── Fila TOTAL (si hay más de un campamento) ──────────────────
+    if len(filas) > 1:
+        num_keys = [k for k in filas[0] if k != 'Campamento' and 'pct' not in k]
+        total = {'Campamento': 'TOTAL'}
+        for k in num_keys:
+            total[k] = sum(f[k] for f in filas)
+        total['HOT_pct_Hab']  = pct(total['HOT_Con Hab en Salto'],  total['HOT_Total'])
+        total['HOT_pct_Cal']  = pct(total['HOT_Con Calendario'],    total['HOT_Total'])
+        total['HOT_pct_Hor']  = pct(total['HOT_Con Tabla Horario'], total['HOT_Total'])
+        total['HOT_pct_Todo'] = pct(total['HOT_Con Todo'],          total['HOT_Total'])
+        total['HOT_pct_Act']  = pct(total['HOT_Act Tarjetas'],      total['HOT_Total'])
+        filas.append(total)
+
+    return filas
+
+
 def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
     # ── Mapa ──────────────────────────────────────────────────────
     if isinstance(mapa_bytes_o_df, pd.DataFrame):
@@ -568,16 +697,27 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
         pct_calendario = None
         pct_horario    = None
 
+    # ── Resumen Ejecutivo por Campamento ─────────────────────────
+    resumen_ejecutivo = None
+    if es_csv_salto:
+        resumen_ejecutivo = _calcular_resumen_ejecutivo(
+            df_sal, df_hot, df_map,
+            sal_idx, hot_idx, comunes,
+            hot_hab, hot_mod,
+            map_nm, map_hab, map_camp
+        )
+
     return {
-        'discrepancias':    discrepancias,
-        'coincidencias':    coincidencias,
-        'solo_hotel':       solo_hotel,
-        'solo_salto':       solo_salto,
-        'hab_sin_mapa':     hab_sin_mapa,
-        'door_sin_mapa':    door_sin_mapa,
-        'sin_calendario':   sin_calendario,
-        'sin_tabla_horario':sin_tabla_horario,
-        'es_csv_salto':     es_csv_salto,
+        'discrepancias':     discrepancias,
+        'coincidencias':     coincidencias,
+        'solo_hotel':        solo_hotel,
+        'solo_salto':        solo_salto,
+        'hab_sin_mapa':      hab_sin_mapa,
+        'door_sin_mapa':     door_sin_mapa,
+        'sin_calendario':    sin_calendario,
+        'sin_tabla_horario': sin_tabla_horario,
+        'es_csv_salto':      es_csv_salto,
+        'resumen_ejecutivo': resumen_ejecutivo,
         'stats': {
             'total_hotel':       len(df_hot),
             'total_salto':       len(df_sal),
@@ -678,10 +818,133 @@ def generar_excel(results):
             ws.append([item])
         _ajustar_cols(ws)
 
+    # ── Hoja: Resumen Ejecutivo ───────────────────────────────────
+    if results.get('resumen_ejecutivo'):
+        ws_res = wb.create_sheet("Resumen Ejecutivo", 0)   # primera hoja
+        _escribir_resumen_excel(ws_res, results['resumen_ejecutivo'])
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
     return buf.read()
+
+
+def _escribir_resumen_excel(ws, filas):
+    """Genera la hoja Resumen Ejecutivo con el formato de cuadro de gestión."""
+    from openpyxl.styles import Border, Side
+
+    # ── Paleta ────────────────────────────────────────────────────
+    F_SALTO  = PatternFill("solid", fgColor="2F6496")   # azul oscuro
+    F_HOT    = PatternFill("solid", fgColor="C55A11")   # naranja oscuro
+    F_TODO   = PatternFill("solid", fgColor="922B21")   # rojo oscuro (con todo)
+    F_ACT    = PatternFill("solid", fgColor="7F7F7F")   # gris (tarjetas)
+    F_VIS    = PatternFill("solid", fgColor="1F5C99")   # azul medio (visitas)
+    F_CAMP   = PatternFill("solid", fgColor="1A1A2E")   # casi negro
+    F_TOTAL  = PatternFill("solid", fgColor="EDEDED")   # gris claro para fila total
+    F_DATA_S = PatternFill("solid", fgColor="D6E4F0")   # fondo filas SALTO
+    F_DATA_H = PatternFill("solid", fgColor="FDEBD0")   # fondo filas HOT
+    F_DATA_T = PatternFill("solid", fgColor="FADBD8")   # fondo filas CON TODO
+    F_DATA_A = PatternFill("solid", fgColor="EAECEE")   # fondo filas ACT
+    F_PCT    = PatternFill("solid", fgColor="FDFEFE")   # % columnas: casi blanco
+
+    BOLD_W = Font(bold=True, color="FFFFFF", size=10)
+    BOLD_B = Font(bold=True, color="1A1A1A", size=10)
+    NORM   = Font(size=10)
+    NORM_B = Font(bold=True, size=10)
+    AC     = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    AL     = Alignment(horizontal='left',   vertical='center')
+    AR     = Alignment(horizontal='right',  vertical='center')
+
+    thin = Side(style='thin', color='CCCCCC')
+    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    def cell(ws, row, col, value, fill=None, font=None, align=None):
+        c = ws.cell(row=row, column=col, value=value)
+        if fill:  c.fill  = fill
+        if font:  c.font  = font
+        if align: c.alignment = align
+        c.border = brd
+        return c
+
+    # ── Fila 1: título secciones (merged) ─────────────────────────
+    #   col:  1=Camp, 2-6=SALTO(5), 7-17=HOT(11)
+    ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=6)
+    c = ws.cell(1, 2, "SALTO"); c.fill = F_SALTO; c.font = BOLD_W; c.alignment = AC; c.border = brd
+    ws.merge_cells(start_row=1, start_column=7, end_row=1, end_column=17)
+    c = ws.cell(1, 7, "BBDD Hotelería"); c.fill = F_HOT; c.font = BOLD_W; c.alignment = AC; c.border = brd
+    c = ws.cell(1, 1, "Campamento"); c.fill = F_CAMP; c.font = BOLD_W; c.alignment = AC; c.border = brd
+
+    # ── Fila 2: encabezados de columnas ───────────────────────────
+    headers = [
+        # (texto, fill, col_idx)
+        ("Campamento",                    F_CAMP,  1),
+        ("Total\nUsuarios",               F_SALTO, 2),
+        ("Con 1 Hab.\nAsignada",          F_SALTO, 3),
+        ("Con Calendario\nAsignado",      F_SALTO, 4),
+        ("Con Tabla\nHorario Asignada",   F_SALTO, 5),
+        ("Sobrantes\n(Visitas)",          F_VIS,   6),
+        ("Total\nUsuarios",               F_HOT,   7),
+        ("Con Solo 1 Hab.\nAsig. en Salto", F_HOT, 8),
+        ("% Asig.\nHab.",                 F_HOT,   9),
+        ("Con Calendario\nAsignado",      F_HOT,   10),
+        ("% Asig.\nCalendario",           F_HOT,   11),
+        ("Con Tabla\nHorario Asignada",   F_HOT,   12),
+        ("% Asig.\nTabla Horario",        F_HOT,   13),
+        ("Con Hab., Cal.\ny Tabla Hor.",  F_TODO,  14),
+        ("% Avance\nReal",               F_TODO,  15),
+        ("Total Act.\nTarjetas",          F_ACT,   16),
+        ("% Act.\nTarjetas",              F_ACT,   17),
+    ]
+    for txt, fill, col in headers:
+        c = ws.cell(2, col, txt)
+        c.fill = fill; c.font = BOLD_W; c.alignment = AC; c.border = brd
+
+    ws.row_dimensions[1].height = 22
+    ws.row_dimensions[2].height = 40
+
+    # ── Filas de datos ─────────────────────────────────────────────
+    for i, fila in enumerate(filas, start=3):
+        es_total = fila.get('Campamento') == 'TOTAL'
+        row_font = NORM_B if es_total else NORM
+
+        data_cols = [
+            (fila['Campamento'],            F_TOTAL if es_total else F_CAMP,   BOLD_W if es_total else BOLD_W),
+            (fila['SAL_Total'],             F_TOTAL if es_total else F_DATA_S, row_font),
+            (fila['SAL_Con Hab'],           F_TOTAL if es_total else F_DATA_S, row_font),
+            (fila['SAL_Con Calendario'],    F_TOTAL if es_total else F_DATA_S, row_font),
+            (fila['SAL_Con Tabla Horario'], F_TOTAL if es_total else F_DATA_S, row_font),
+            # Visitas: valor + "(visitas)"
+            (f"{fila['SAL_Visitas']:,}\n(visitas)" if isinstance(fila.get('SAL_Visitas'), int)
+             else fila.get('SAL_Visitas',''),
+             F_TOTAL if es_total else F_VIS, BOLD_W if not es_total else NORM_B),
+            (fila['HOT_Total'],             F_TOTAL if es_total else F_DATA_H, row_font),
+            (fila['HOT_Con Hab en Salto'],  F_TOTAL if es_total else F_DATA_H, row_font),
+            (f"{fila['HOT_pct_Hab']}%",     F_TOTAL if es_total else F_PCT,    row_font),
+            (fila['HOT_Con Calendario'],    F_TOTAL if es_total else F_DATA_H, row_font),
+            (f"{fila['HOT_pct_Cal']}%",     F_TOTAL if es_total else F_PCT,    row_font),
+            (fila['HOT_Con Tabla Horario'], F_TOTAL if es_total else F_DATA_H, row_font),
+            (f"{fila['HOT_pct_Hor']}%",     F_TOTAL if es_total else F_PCT,    row_font),
+            (fila['HOT_Con Todo'],          F_TOTAL if es_total else F_DATA_T, row_font),
+            (f"{fila['HOT_pct_Todo']}%",    F_TOTAL if es_total else F_DATA_T, row_font),
+            (fila['HOT_Act Tarjetas'],      F_TOTAL if es_total else F_DATA_A, row_font),
+            (f"{fila['HOT_pct_Act']}%",     F_TOTAL if es_total else F_DATA_A, row_font),
+        ]
+
+        for col_idx, (val, fill, fnt) in enumerate(data_cols, start=1):
+            c = ws.cell(i, col_idx, val)
+            c.fill  = fill
+            c.font  = fnt if not (col_idx == 1 and not es_total) else Font(bold=True, color="FFFFFF", size=10)
+            c.alignment = AC
+            c.border = brd
+
+        ws.row_dimensions[i].height = 26
+
+    # ── Anchos de columna ─────────────────────────────────────────
+    widths = [18, 12, 14, 16, 16, 14, 12, 18, 10, 16, 12, 16, 14, 16, 10, 14, 12]
+    for col_idx, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = w
+
+    ws.freeze_panes = 'B3'
 
 
 # ─────────────────────────────────────────────
