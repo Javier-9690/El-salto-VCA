@@ -677,32 +677,64 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
               .apply(limpiar).replace('', pd.NA).dropna().unique().tolist()
     )
 
-    # ── Sin Calendario / Sin Tabla Horario ────────────────────────
-    # Solo usuarios que aparecen en AMBAS bases (están en Hotelería)
-    sin_calendario    = []
-    sin_tabla_horario = []
+    # ── Sin Calendario / Sin Tabla Horario ───────────────────────
+    # sin_calendario / sin_tabla_horario → solo usuarios en AMBAS bases (Hotelería)
+    # sal_sin_calendario / sal_sin_tabla_horario → TODOS los usuarios de El Salto
+    sin_calendario       = []
+    sin_tabla_horario    = []
+    sal_sin_calendario   = []
+    sal_sin_tabla_horario = []
+
+    invalid_cal_set = frozenset(('No válido', 'No válida', 'Desconocido', ''))
+    invalid_hor_set = frozenset(('No válida', 'Desconocido', ''))
 
     if es_csv_salto:
-        for rut in comunes:
-            row = sal_idx[rut]
-            h   = hot_idx[rut]
-            rec = {
+        hot_ruts_set  = frozenset(hot_idx.keys())
+        comunes_set   = frozenset(comunes)
+
+        for rut, row in sal_idx.items():
+            en_hot = rut in hot_ruts_set
+            h      = hot_idx[rut] if en_hot else {}
+
+            # Registro enriquecido con datos de Hotelería cuando están disponibles
+            rec_sal = {
                 'RUT/ExtID':       rut,
                 'Nombre':          limpiar(row.get('FullName', '')),
-                'HAB Hotelería':   limpiar(h.get(hot_hab, '')) if hot_hab else '',
+                'En Hotelería':    'Sí' if en_hot else 'No (visita)',
                 'HAB El Salto':    limpiar(row.get('NameDoorList', '')),
-                'Empresa':         limpiar(h.get(hot_emp, ''))  if hot_emp  else '',
-                'Módulo':          limpiar(h.get(hot_mod, ''))  if hot_mod  else '',
                 'Calendario':      limpiar(row.get('Calendario', '')),
                 'Tipo Calendario': limpiar(row.get('TipoCalendario', '')),
                 'Tabla Horario':   limpiar(row.get('TablaHorario', '')),
                 'Clasif. Horario': limpiar(row.get('ClasifTablaHorario', '')),
                 'Estado Llave':    limpiar(row.get('EstadoLlave', '')),
             }
-            if limpiar(row.get('TipoCalendario', '')) in ('No válido', 'No válida', 'Desconocido', ''):
-                sin_calendario.append(rec)
-            if limpiar(row.get('ClasifTablaHorario', '')) in ('No válida', 'Desconocido', ''):
-                sin_tabla_horario.append(rec)
+            cal_invalido = limpiar(row.get('TipoCalendario', '')) in invalid_cal_set
+            hor_invalido = limpiar(row.get('ClasifTablaHorario', '')) in invalid_hor_set
+
+            if cal_invalido:
+                sal_sin_calendario.append(rec_sal)
+            if hor_invalido:
+                sal_sin_tabla_horario.append(rec_sal)
+
+            # Solo comunes → listas originales con datos Hotelería completos
+            if rut in comunes_set:
+                rec_hot = {
+                    'RUT/ExtID':       rut,
+                    'Nombre':          limpiar(row.get('FullName', '')),
+                    'HAB Hotelería':   limpiar(h.get(hot_hab, '')) if hot_hab else '',
+                    'HAB El Salto':    limpiar(row.get('NameDoorList', '')),
+                    'Empresa':         limpiar(h.get(hot_emp, ''))  if hot_emp  else '',
+                    'Módulo':          limpiar(h.get(hot_mod, ''))  if hot_mod  else '',
+                    'Calendario':      limpiar(row.get('Calendario', '')),
+                    'Tipo Calendario': limpiar(row.get('TipoCalendario', '')),
+                    'Tabla Horario':   limpiar(row.get('TablaHorario', '')),
+                    'Clasif. Horario': limpiar(row.get('ClasifTablaHorario', '')),
+                    'Estado Llave':    limpiar(row.get('EstadoLlave', '')),
+                }
+                if cal_invalido:
+                    sin_calendario.append(rec_hot)
+                if hor_invalido:
+                    sin_tabla_horario.append(rec_hot)
 
     # ── Métricas de cumplimiento ──────────────────────────────────
     total_comunes = len(comunes)
@@ -742,9 +774,11 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
         'solo_salto':        solo_salto,
         'hab_sin_mapa':      hab_sin_mapa,
         'door_sin_mapa':     door_sin_mapa,
-        'sin_calendario':    sin_calendario,
-        'sin_tabla_horario': sin_tabla_horario,
-        'es_csv_salto':      es_csv_salto,
+        'sin_calendario':        sin_calendario,
+        'sin_tabla_horario':     sin_tabla_horario,
+        'sal_sin_calendario':    sal_sin_calendario,
+        'sal_sin_tabla_horario': sal_sin_tabla_horario,
+        'es_csv_salto':          es_csv_salto,
         'resumen_ejecutivo': resumen_ejecutivo,
         'ruts_dup_hot':      ruts_dup_hot,
         'ruts_dup_sal':      ruts_dup_sal,
@@ -759,8 +793,10 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
             'solo_salto':        len(solo_salto),
             'hab_sin_mapa':      len(hab_sin_mapa),
             'door_sin_mapa':     len(door_sin_mapa),
-            'ruts_dup_hot':      len(ruts_dup_hot),
-            'ruts_dup_sal':      len(ruts_dup_sal),
+            'ruts_dup_hot':           len(ruts_dup_hot),
+            'ruts_dup_sal':           len(ruts_dup_sal),
+            'sal_sin_calendario':     len(sal_sin_calendario),
+            'sal_sin_tabla_horario':  len(sal_sin_tabla_horario),
             'sin_calendario':    len(sin_calendario),
             'sin_tabla_horario': len(sin_tabla_horario),
             # Porcentajes de cumplimiento
@@ -834,12 +870,20 @@ def generar_excel(results):
 
     # Nuevas hojas sólo si vienen del CSV
     if results.get('sin_calendario'):
-        ws5 = wb.create_sheet("Sin Calendario")
+        ws5 = wb.create_sheet("Sin Cal. (Hotelería)")
         _escribir_hoja(ws5, results['sin_calendario'], MORADO)
 
     if results.get('sin_tabla_horario'):
-        ws6 = wb.create_sheet("Sin Tabla Horario")
+        ws6 = wb.create_sheet("Sin Hor. (Hotelería)")
         _escribir_hoja(ws6, results['sin_tabla_horario'], AMARILLO)
+
+    if results.get('sal_sin_calendario'):
+        ws7 = wb.create_sheet("Sin Cal. (El Salto)")
+        _escribir_hoja(ws7, results['sal_sin_calendario'], MORADO)
+
+    if results.get('sal_sin_tabla_horario'):
+        ws8 = wb.create_sheet("Sin Hor. (El Salto)")
+        _escribir_hoja(ws8, results['sal_sin_tabla_horario'], AMARILLO)
 
     for titulo, lista in [("Sin mapa (Hotelería)", results['hab_sin_mapa']),
                           ("Sin mapa (El Salto)",  results['door_sin_mapa'])]:
