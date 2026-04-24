@@ -226,6 +226,20 @@
       color:#2C3E50; border-left-color:#2C3E50;
       letter-spacing:.04em;
     }
+    .sc-sinmapa-row td {
+      background:#F7F7F7 !important;
+      opacity:.82;
+    }
+    .sc-sinmapa-row .sc-camp {
+      color:#888; border-left-color:#bbb;
+      font-style:italic; font-weight:600;
+    }
+    .sc-sinmapa-row .sc-sal,
+    .sc-sinmapa-row .sc-hot,
+    .sc-sinmapa-row .sc-vis,
+    .sc-sinmapa-row .sc-todo,
+    .sc-sinmapa-row .sc-act { color:#aaa; }
+    .sc-sinmapa-row .pct-pill { opacity:.6; }
     .sc-total-row .sc-sal,
     .sc-total-row .sc-hot,
     .sc-total-row .sc-todo,
@@ -474,10 +488,13 @@
             </thead>
             <tbody>
               {% for fila in results.resumen_ejecutivo %}
-              {% set es_total = fila.Campamento == 'TOTAL' %}
-              <tr class="{{ 'sc-total-row' if es_total else '' }}">
+              {% set es_total   = fila.Campamento == 'TOTAL' %}
+              {% set es_sinmapa = fila.Campamento == 'Sin mapa' %}
+              <tr class="{{ 'sc-total-row' if es_total else ('sc-sinmapa-row' if es_sinmapa else '') }}">
                 <td class="sc-camp">
-                  {% if es_total %}<i class="bi bi-sigma me-1"></i>{% endif %}
+                  {% if es_total %}<i class="bi bi-sigma me-1"></i>
+                  {% elif es_sinmapa %}<i class="bi bi-question-circle me-1 text-secondary"></i>
+                  {% endif %}
                   {{ fila.Campamento }}
                 </td>
                 {# SALTO #}

@@ -411,7 +411,99 @@
     const btn = document.getElementById('btnProcesar');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+    showLoader();
   });
+
+  /* ─── Loader overlay ─────────────────────────────── */
+  const STEPS = [
+    { pct: 5,  msg: 'Leyendo archivos...' },
+    { pct: 15, msg: 'Normalizando RUTs...' },
+    { pct: 28, msg: 'Construyendo índices...' },
+    { pct: 42, msg: 'Cruzando bases de datos...' },
+    { pct: 56, msg: 'Calculando discrepancias...' },
+    { pct: 68, msg: 'Verificando calendarios y horarios...' },
+    { pct: 78, msg: 'Generando resumen ejecutivo...' },
+    { pct: 87, msg: 'Preparando tablas por campamento...' },
+    { pct: 93, msg: 'Construyendo reporte Excel...' },
+    { pct: 97, msg: 'Casi listo...' },
+  ];
+
+  function showLoader() {
+    const overlay = document.getElementById('loaderOverlay');
+    const bar     = document.getElementById('loaderBar');
+    const pctEl   = document.getElementById('loaderPct');
+    const msgEl   = document.getElementById('loaderMsg');
+    overlay.style.display = 'flex';
+
+    let step = 0;
+    let currentPct = 0;
+
+    function animateTo(target, onDone) {
+      if (currentPct >= target) { if (onDone) onDone(); return; }
+      currentPct++;
+      bar.style.width = currentPct + '%';
+      pctEl.textContent = currentPct + '%';
+      const delay = currentPct < 80 ? 60 : currentPct < 93 ? 120 : 300;
+      setTimeout(() => animateTo(target, onDone), delay);
+    }
+
+    function nextStep() {
+      if (step >= STEPS.length) return;
+      const { pct, msg } = STEPS[step];
+      msgEl.textContent = msg;
+      step++;
+      animateTo(pct, () => setTimeout(nextStep, 400));
+    }
+
+    nextStep();
+  }
 </script>
+
+<!-- ─── Loader Overlay ──────────────────────────────────── -->
+<div id="loaderOverlay" style="
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(15,20,40,.82); backdrop-filter:blur(4px);
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:20px;">
+
+  <div style="text-align:center; color:#fff;">
+    <div style="font-size:2.4rem; margin-bottom:6px;">⚙️</div>
+    <div style="font-size:1.05rem; font-weight:600; letter-spacing:.02em;">Procesando comparación</div>
+    <div id="loaderMsg" style="font-size:.82rem; color:#aac4ff; margin-top:4px; min-height:1.2em;">
+      Leyendo archivos...
+    </div>
+  </div>
+
+  <div style="width:min(480px,85vw);">
+    <div style="
+      background:rgba(255,255,255,.12); border-radius:999px;
+      height:12px; overflow:hidden;">
+      <div id="loaderBar" style="
+        height:100%; width:0%; border-radius:999px;
+        background:linear-gradient(90deg,#4e9af1,#a78bfa);
+        transition:width .25s ease;"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:6px;">
+      <span id="loaderPct" style="font-size:.75rem; color:#aac4ff; font-weight:700;">0%</span>
+      <span style="font-size:.72rem; color:#667; font-style:italic;">
+        El análisis puede tomar hasta 60 segundos con archivos grandes
+      </span>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:6px; margin-top:4px;">
+    <span style="width:8px;height:8px;border-radius:50%;background:#4e9af1;animation:dot-bounce .9s infinite ease-in-out;animation-delay:0s;"></span>
+    <span style="width:8px;height:8px;border-radius:50%;background:#7c69f0;animation:dot-bounce .9s infinite ease-in-out;animation-delay:.2s;"></span>
+    <span style="width:8px;height:8px;border-radius:50%;background:#a78bfa;animation:dot-bounce .9s infinite ease-in-out;animation-delay:.4s;"></span>
+  </div>
+</div>
+
+<style>
+@keyframes dot-bounce {
+  0%,80%,100% { transform:scale(.6); opacity:.4; }
+  40%          { transform:scale(1.2); opacity:1; }
+}
+</style>
+
 </body>
 </html>
