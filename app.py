@@ -815,6 +815,8 @@ def generar_excel(results):
     if results.get('resumen_ejecutivo'):
         ws_res = wb.create_sheet("Resumen Ejecutivo", 0)   # primera hoja
         _escribir_resumen_excel(ws_res, results['resumen_ejecutivo'])
+        ws_glo = wb.create_sheet("Glosario", 1)
+        _escribir_glosario_excel(ws_glo)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -938,6 +940,219 @@ def _escribir_resumen_excel(ws, filas):
         ws.column_dimensions[get_column_letter(col_idx)].width = w
 
     ws.freeze_panes = 'B3'
+
+
+def _escribir_glosario_excel(ws):
+    """Hoja explicativa de cada métrica del Resumen Ejecutivo."""
+    from openpyxl.styles import Border, Side
+
+    # ── Paleta ────────────────────────────────────────────────────
+    F_TITULO  = PatternFill("solid", fgColor="1A1A2E")   # casi negro
+    F_SALTO   = PatternFill("solid", fgColor="2F6496")   # azul SALTO
+    F_HOT     = PatternFill("solid", fgColor="C55A11")   # naranja HOT
+    F_TODO    = PatternFill("solid", fgColor="922B21")   # rojo Con Todo
+    F_ACT     = PatternFill("solid", fgColor="7F7F7F")   # gris Tarjetas
+    F_VIS     = PatternFill("solid", fgColor="1F5C99")   # azul Visitas
+    F_HEADER  = PatternFill("solid", fgColor="D9D9D9")   # gris claro encabezados
+    F_EVEN    = PatternFill("solid", fgColor="F7F9FB")   # fila par
+    F_ODD     = PatternFill("solid", fgColor="FFFFFF")   # fila impar
+
+    BOLD_W = Font(bold=True, color="FFFFFF", size=11)
+    BOLD_B = Font(bold=True, color="1A1A1A", size=11)
+    NORM   = Font(size=10, color="1A1A1A")
+    SMALL  = Font(size=9,  color="555555", italic=True)
+    AC = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    AL = Alignment(horizontal='left',   vertical='center', wrap_text=True)
+
+    thin = Side(style='thin', color='CCCCCC')
+    med  = Side(style='medium', color='999999')
+    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
+    brd_med = Border(left=med, right=med, top=med, bottom=med)
+
+    # ── Anchos ────────────────────────────────────────────────────
+    ws.column_dimensions['A'].width = 6    # #
+    ws.column_dimensions['B'].width = 28   # Métrica
+    ws.column_dimensions['C'].width = 60   # Descripción
+    ws.column_dimensions['D'].width = 30   # Fuente
+    ws.column_dimensions['E'].width = 24   # Fórmula
+
+    row = 1
+
+    # ── Título ────────────────────────────────────────────────────
+    ws.merge_cells(f'A{row}:E{row}')
+    c = ws.cell(row, 1, "GLOSARIO — Resumen Ejecutivo de Asignaciones")
+    c.fill = F_TITULO; c.font = BOLD_W; c.alignment = AC
+    ws.row_dimensions[row].height = 28
+    row += 1
+
+    ws.merge_cells(f'A{row}:E{row}')
+    c = ws.cell(row, 1,
+        "Descripción de cada indicador que aparece en la hoja «Resumen Ejecutivo». "
+        "Las columnas de porcentaje (%) se calculan sobre el universo de usuarios "
+        "presentes en BBDD Hotelería que tienen un registro coincidente en El Salto (usuarios comunes).")
+    c.fill = F_EVEN; c.font = SMALL; c.alignment = AL
+    ws.row_dimensions[row].height = 36
+    row += 1
+
+    row += 1  # espaciado
+
+    # ── Encabezados de columna ────────────────────────────────────
+    headers = ["#", "Métrica", "Descripción", "Fuente de datos", "Fórmula / Criterio"]
+    for col_idx, h in enumerate(headers, 1):
+        c = ws.cell(row, col_idx, h)
+        c.fill = F_HEADER; c.font = BOLD_B; c.alignment = AC; c.border = brd
+    ws.row_dimensions[row].height = 22
+    row += 1
+
+    # ── Métricas ──────────────────────────────────────────────────
+    # Formato: (nº, nombre, descripción, fuente, fórmula, color_sección)
+    metricas = [
+        # ── SECCIÓN SALTO ──────────────────────────────────────────
+        (None, "── SECCIÓN: SALTO (Control de Acceso) ──", "", "", "", F_SALTO),
+
+        (1, "Total Usuarios (SALTO)",
+         "Cantidad total de personas registradas en el sistema de control de acceso El Salto "
+         "que pertenecen al campamento indicado, sin importar su estado.",
+         "El Salto (exportacionusuarios.csv)",
+         "COUNT(RUT por campamento según mapa NM SALTO → CAMPAMENTO)", None),
+
+        (2, "Con 1 Hab. Asignada (SALTO)",
+         "Usuarios de El Salto que tienen al menos una puerta/habitación asignada "
+         "(campo ExtDoorIDList / NameDoorList no vacío).",
+         "El Salto (exportacionusuarios.csv)",
+         "COUNT donde NameDoorList ≠ vacío", None),
+
+        (3, "Con Calendario Asignado (SALTO)",
+         "Usuarios de El Salto cuyo tipo de calendario es válido. "
+         "Se excluyen los valores: 'No válido', 'No válida', 'Desconocido' y vacío.",
+         "El Salto (exportacionusuarios.csv)",
+         "COUNT donde TipoCalendario ∉ {'No válido','No válida','Desconocido',''}", None),
+
+        (4, "Con Tabla Horario Asignada (SALTO)",
+         "Usuarios de El Salto con tabla de horario válida. "
+         "Se excluyen: 'No válida', 'Desconocido' y vacío.",
+         "El Salto (exportacionusuarios.csv)",
+         "COUNT donde ClasifTablaHorario ∉ {'No válida','Desconocido',''}", None),
+
+        (5, "Sobrantes (Visitas)",
+         "Personas registradas en El Salto pero que NO aparecen en la BBDD Hotelería. "
+         "Corresponden a visitas, contratistas temporales u otros usuarios no alojados. "
+         "Se muestran entre paréntesis como '(visitas)' para distinguirlos de residentes.",
+         "El Salto (exportacionusuarios.csv) — ausentes en Hotelería",
+         "COUNT(RUT en SALTO) − COUNT(RUT en SALTO ∩ Hotelería)", None),
+
+        # ── SECCIÓN HOTELERÍA ──────────────────────────────────────
+        (None, "── SECCIÓN: BBDD Hotelería ──", "", "", "", F_HOT),
+
+        (6, "Total Usuarios (Hotelería)",
+         "Cantidad de personas registradas en la base de datos del sistema Hotelería "
+         "para el campamento correspondiente.",
+         "BBDD Hotelería (Excel)",
+         "COUNT(RUT por campamento según mapa HAB → CAMPAMENTO)", None),
+
+        (7, "Con Solo 1 Hab. Asig. en Salto",
+         "De los usuarios comunes (presentes en ambos sistemas), cuántos tienen "
+         "exactamente una habitación asignada en El Salto.",
+         "Cruce SALTO ∩ Hotelería",
+         "COUNT(comunes) donde NameDoorList ≠ vacío", None),
+
+        (8, "% Asig. Hab.",
+         "Porcentaje de usuarios de Hotelería que tienen habitación asignada en El Salto. "
+         "Indica la cobertura de asignación de acceso físico.",
+         "Cálculo",
+         "(Con 1 Hab. Asig. en Salto / Total Usuarios Hotelería) × 100", None),
+
+        (9, "Con Calendario Asignado (Hotelería)",
+         "De los usuarios comunes, cuántos tienen un calendario válido en El Salto. "
+         "El calendario define los horarios de acceso permitidos.",
+         "Cruce SALTO ∩ Hotelería",
+         "COUNT(comunes) donde TipoCalendario es válido", None),
+
+        (10, "% Asig. Calendario",
+         "Porcentaje de usuarios de Hotelería con calendario de acceso válido en El Salto.",
+         "Cálculo",
+         "(Con Calendario Asignado / Total Usuarios Hotelería) × 100", None),
+
+        (11, "Con Tabla Horario Asignada (Hotelería)",
+         "De los usuarios comunes, cuántos tienen una tabla de horario válida en El Salto. "
+         "La tabla de horario define los bloques de tiempo en que se permite el acceso.",
+         "Cruce SALTO ∩ Hotelería",
+         "COUNT(comunes) donde ClasifTablaHorario es válida", None),
+
+        (12, "% Asig. Tabla Horario",
+         "Porcentaje de usuarios de Hotelería con tabla de horario válida en El Salto.",
+         "Cálculo",
+         "(Con Tabla Horario Asignada / Total Usuarios Hotelería) × 100", None),
+
+        # ── SECCIÓN CON TODO ───────────────────────────────────────
+        (None, "── SECCIÓN: Con Todo (Configuración Completa) ──", "", "", "", F_TODO),
+
+        (13, "Con Hab., Cal. y Tabla Hor. (Con Todo)",
+         "Usuarios comunes que cumplen simultáneamente las tres condiciones: "
+         "tienen habitación asignada, calendario válido Y tabla de horario válida. "
+         "Este es el indicador de configuración completa y correcta en El Salto.",
+         "Cruce SALTO ∩ Hotelería",
+         "COUNT(comunes) donde Hab. ≠ vacío AND Cal. válido AND Tabla Hor. válida", None),
+
+        (14, "% Avance Real",
+         "Porcentaje de usuarios de Hotelería con configuración completa (Con Todo). "
+         "Es el indicador clave de avance en la configuración del sistema de acceso.",
+         "Cálculo",
+         "(Con Todo / Total Usuarios Hotelería) × 100", None),
+
+        # ── SECCIÓN TARJETAS ───────────────────────────────────────
+        (None, "── SECCIÓN: Actualización de Tarjetas ──", "", "", "", F_ACT),
+
+        (15, "Total Act. Tarjetas",
+         "Cantidad de usuarios en El Salto cuya tarjeta requiere ser actualizada. "
+         "Incluye los estados: 'Actualización requerida', 'Reedición requerida' y 'Llave expirada'.",
+         "El Salto (exportacionusuarios.csv) — campo EstadoLlave",
+         "COUNT donde EstadoLlave ∈ {'Actualización requerida','Reedición requerida','Llave expirada'}", None),
+
+        (16, "% Act. Tarjetas",
+         "Porcentaje de usuarios del campamento en El Salto cuya tarjeta necesita actualización. "
+         "Un valor alto indica que hay muchas tarjetas pendientes de configurar en los lectores.",
+         "Cálculo",
+         "(Total Act. Tarjetas / Total Usuarios SALTO por campamento) × 100", None),
+    ]
+
+    for i, entry in enumerate(metricas):
+        num, nombre, desc, fuente, formula, color_sec = entry
+        is_header = num is None
+        bg = color_sec if is_header else (F_EVEN if i % 2 == 0 else F_ODD)
+
+        if is_header:
+            # Fila de sección: merge toda la fila
+            ws.merge_cells(f'A{row}:E{row}')
+            c = ws.cell(row, 1, nombre)
+            c.fill = color_sec; c.font = BOLD_W; c.alignment = AL
+            c.border = brd
+            ws.row_dimensions[row].height = 20
+        else:
+            vals = [num, nombre, desc, fuente, formula]
+            for col_idx, val in enumerate(vals, 1):
+                c = ws.cell(row, col_idx, val)
+                c.fill = bg
+                c.font = BOLD_B if col_idx == 2 else NORM
+                c.alignment = AL
+                c.border = brd
+            ws.row_dimensions[row].height = 54
+
+        row += 1
+
+    # ── Nota al pie ───────────────────────────────────────────────
+    row += 1
+    ws.merge_cells(f'A{row}:E{row}')
+    c = ws.cell(row, 1,
+        "NOTA: Los usuarios 'comunes' son aquellos cuyo RUT aparece en AMBOS sistemas (El Salto y Hotelería). "
+        "Los porcentajes de las columnas HOT se calculan sobre el total de usuarios de Hotelería del campamento, "
+        "no sobre los comunes, para reflejar la cobertura real del sistema.")
+    c.fill = PatternFill("solid", fgColor="FFF9C4")   # amarillo suave
+    c.font = Font(size=9, color="5D4037", italic=True)
+    c.alignment = AL
+    ws.row_dimensions[row].height = 42
+
+    ws.freeze_panes = 'B5'
 
 
 # ─────────────────────────────────────────────
