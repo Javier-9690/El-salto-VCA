@@ -880,49 +880,33 @@ ALIGN_C  = Alignment(horizontal='center', vertical='center', wrap_text=True)
 ALIGN_L  = Alignment(horizontal='left',   vertical='center', wrap_text=True)
 
 
-def _woc(ws, value, fill=None, font=None, align=None):
-    """Crea un WriteOnlyCell con estilo opcional."""
-    from openpyxl.cell.cell import WriteOnlyCell
-    c = WriteOnlyCell(ws, value=value)
-    if fill:  c.fill  = fill
-    if font:  c.font  = font
-    if align: c.alignment = align
-    return c
+def _ajustar_cols(ws):
+    for col in ws.columns:
+        ancho = max((len(str(c.value or '')) for c in col), default=10)
+        ws.column_dimensions[get_column_letter(col[0].column)].width = min(ancho + 4, 45)
+    ws.row_dimensions[1].height = 30
 
 
 def _escribir_hoja(ws, datos, fill_fila=None):
-    """Escribe datos en modo write-only (streaming) — sin cargar todo en RAM."""
     if not datos:
-        ws.append([_woc(ws, "Sin registros", fill=GRIS)])
+        ws.append(["Sin registros"])
+        ws['A1'].fill = GRIS
         return
     headers = list(datos[0].keys())
-    # Anchos automáticos basados en el nombre del header
-    for i, h in enumerate(headers, 1):
-        ws.column_dimensions[get_column_letter(i)].width = min(max(len(str(h)) + 4, 12), 45)
-    ws.row_dimensions[1].height = 30
-    # Cabecera
-    ws.append([_woc(ws, h, fill=HEADER, font=FHEADER, align=ALIGN_C) for h in headers])
-    # Datos (fila a fila, sin mantener en memoria)
-    for fila in datos:
-        ws.append([
-            _woc(ws, fila.get(h, ''), fill=fill_fila, font=FCELL, align=ALIGN_L)
-            for h in headers
-        ])
+    ws.append(headers)
+    for celda in ws[1]:
+        celda.fill = HEADER; celda.font = FHEADER; celda.alignment = ALIGN_C
+    for i, fila in enumerate(datos, start=2):
+        for j, h in enumerate(headers, start=1):
+            c = ws.cell(row=i, column=j, value=fila.get(h, ''))
+            if fill_fila:
+                c.fill = fill_fila; c.font = FCELL; c.alignment = ALIGN_L
+    _ajustar_cols(ws)
 
 
 def generar_excel(results):
-    """Genera el Excel en modo write_only (streaming) — rápido y bajo en RAM."""
-    wb = Workbook(write_only=True)
-
-    # ── Resumen Ejecutivo + Glosario (primeras hojas) ─────────────
-    if results.get('resumen_ejecutivo'):
-        ws_res = wb.create_sheet("Resumen Ejecutivo")
-        _escribir_resumen_excel(ws_res, results['resumen_ejecutivo'])
-        ws_glo = wb.create_sheet("Glosario")
-        _escribir_glosario_excel(ws_glo)
-
-    # ── Hojas de datos ────────────────────────────────────────────
-    ws1 = wb.create_sheet("Discrepancias RUT")
+    wb = Workbook()
+    ws1 = wb.active; ws1.title = "Discrepancias RUT"
     _escribir_hoja(ws1, results['discrepancias'], ROJO)
 
     ws2 = wb.create_sheet("Solo en Hotelería")
@@ -934,6 +918,7 @@ def generar_excel(results):
     ws4 = wb.create_sheet("Coincidencias")
     _escribir_hoja(ws4, results['coincidencias'], VERDE)
 
+    # Nuevas hojas sólo si vienen del CSV
     if results.get('sin_calendario'):
         ws5 = wb.create_sheet("Sin Cal. (Hotelería)")
         _escribir_hoja(ws5, results['sin_calendario'], MORADO)
@@ -954,13 +939,21 @@ def generar_excel(results):
         ws9 = wb.create_sheet("Multi Habitación")
         _escribir_hoja(ws9, results['multi_hab'], NARANJA)
 
-    for titulo, lista in [("Sin mapa (Hotelería)", results.get('hab_sin_mapa', [])),
-                          ("Sin mapa (El Salto)",  results.get('door_sin_mapa', []))]:
+    for titulo, lista in [("Sin mapa (Hotelería)", results['hab_sin_mapa']),
+                          ("Sin mapa (El Salto)",  results['door_sin_mapa'])]:
         ws = wb.create_sheet(titulo)
-        ws.column_dimensions['A'].width = 42
-        ws.append([_woc(ws, "Habitaciones sin equivalente", fill=HEADER, font=FHEADER)])
+        ws.append(["Habitaciones sin equivalente"])
+        ws['A1'].fill = HEADER; ws['A1'].font = FHEADER
         for item in lista:
-            ws.append([_woc(ws, item)])
+            ws.append([item])
+        _ajustar_cols(ws)
+
+    # ── Hoja: Resumen Ejecutivo ───────────────────────────────────
+    if results.get('resumen_ejecutivo'):
+        ws_res = wb.create_sheet("Resumen Ejecutivo", 0)   # primera hoja
+        _escribir_resumen_excel(ws_res, results['resumen_ejecutivo'])
+        ws_glo = wb.create_sheet("Glosario", 1)
+        _escribir_glosario_excel(ws_glo)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -969,86 +962,126 @@ def generar_excel(results):
 
 
 def _escribir_resumen_excel(ws, filas):
-    """Resumen Ejecutivo en modo write-only (sin merge_cells)."""
-    F_SALTO  = PatternFill("solid", fgColor="2F6496")
-    F_HOT    = PatternFill("solid", fgColor="C55A11")
-    F_TODO   = PatternFill("solid", fgColor="922B21")
-    F_ACT    = PatternFill("solid", fgColor="7F7F7F")
-    F_VIS    = PatternFill("solid", fgColor="1F5C99")
-    F_CAMP   = PatternFill("solid", fgColor="1A1A2E")
-    F_TOTAL  = PatternFill("solid", fgColor="EDEDED")
-    F_DATA_S = PatternFill("solid", fgColor="D6E4F0")
-    F_DATA_H = PatternFill("solid", fgColor="FDEBD0")
-    F_DATA_T = PatternFill("solid", fgColor="FADBD8")
-    F_DATA_A = PatternFill("solid", fgColor="EAECEE")
-    F_PCT    = PatternFill("solid", fgColor="FDFEFE")
+    """Genera la hoja Resumen Ejecutivo con el formato de cuadro de gestión."""
+    from openpyxl.styles import Border, Side
+
+    # ── Paleta ────────────────────────────────────────────────────
+    F_SALTO  = PatternFill("solid", fgColor="2F6496")   # azul oscuro
+    F_HOT    = PatternFill("solid", fgColor="C55A11")   # naranja oscuro
+    F_TODO   = PatternFill("solid", fgColor="922B21")   # rojo oscuro (con todo)
+    F_ACT    = PatternFill("solid", fgColor="7F7F7F")   # gris (tarjetas)
+    F_VIS    = PatternFill("solid", fgColor="1F5C99")   # azul medio (visitas)
+    F_CAMP   = PatternFill("solid", fgColor="1A1A2E")   # casi negro
+    F_TOTAL  = PatternFill("solid", fgColor="EDEDED")   # gris claro para fila total
+    F_DATA_S = PatternFill("solid", fgColor="D6E4F0")   # fondo filas SALTO
+    F_DATA_H = PatternFill("solid", fgColor="FDEBD0")   # fondo filas HOT
+    F_DATA_T = PatternFill("solid", fgColor="FADBD8")   # fondo filas CON TODO
+    F_DATA_A = PatternFill("solid", fgColor="EAECEE")   # fondo filas ACT
+    F_PCT    = PatternFill("solid", fgColor="FDFEFE")   # % columnas: casi blanco
 
     BOLD_W = Font(bold=True, color="FFFFFF", size=10)
+    BOLD_B = Font(bold=True, color="1A1A1A", size=10)
     NORM   = Font(size=10)
     NORM_B = Font(bold=True, size=10)
-    AC = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    AC     = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    AL     = Alignment(horizontal='left',   vertical='center')
+    AR     = Alignment(horizontal='right',  vertical='center')
 
-    # Anchos y alturas
-    widths = [18, 12, 14, 16, 16, 14, 12, 18, 10, 16, 12, 16, 14, 16, 10, 14, 12]
-    for col_idx, w in enumerate(widths, 1):
-        ws.column_dimensions[get_column_letter(col_idx)].width = w
+    thin = Side(style='thin', color='CCCCCC')
+    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    def cell(ws, row, col, value, fill=None, font=None, align=None):
+        c = ws.cell(row=row, column=col, value=value)
+        if fill:  c.fill  = fill
+        if font:  c.font  = font
+        if align: c.alignment = align
+        c.border = brd
+        return c
+
+    # ── Fila 1: título secciones (merged) ─────────────────────────
+    #   col:  1=Camp, 2-6=SALTO(5), 7-17=HOT(11)
+    ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=6)
+    c = ws.cell(1, 2, "SALTO"); c.fill = F_SALTO; c.font = BOLD_W; c.alignment = AC; c.border = brd
+    ws.merge_cells(start_row=1, start_column=7, end_row=1, end_column=17)
+    c = ws.cell(1, 7, "BBDD Hotelería"); c.fill = F_HOT; c.font = BOLD_W; c.alignment = AC; c.border = brd
+    c = ws.cell(1, 1, "Campamento"); c.fill = F_CAMP; c.font = BOLD_W; c.alignment = AC; c.border = brd
+
+    # ── Fila 2: encabezados de columnas ───────────────────────────
+    headers = [
+        # (texto, fill, col_idx)
+        ("Campamento",                    F_CAMP,  1),
+        ("Total\nUsuarios",               F_SALTO, 2),
+        ("Con 1 Hab.\nAsignada",          F_SALTO, 3),
+        ("Con Calendario\nAsignado",      F_SALTO, 4),
+        ("Con Tabla\nHorario Asignada",   F_SALTO, 5),
+        ("Sobrantes\n(Visitas)",          F_VIS,   6),
+        ("Total\nUsuarios",               F_HOT,   7),
+        ("Con Solo 1 Hab.\nAsig. en Salto", F_HOT, 8),
+        ("% Asig.\nHab.",                 F_HOT,   9),
+        ("Con Calendario\nAsignado",      F_HOT,   10),
+        ("% Asig.\nCalendario",           F_HOT,   11),
+        ("Con Tabla\nHorario Asignada",   F_HOT,   12),
+        ("% Asig.\nTabla Horario",        F_HOT,   13),
+        ("Con Hab., Cal.\ny Tabla Hor.",  F_TODO,  14),
+        ("% Avance\nReal",               F_TODO,  15),
+        ("Total Act.\nTarjetas",          F_ACT,   16),
+        ("% Act.\nTarjetas",              F_ACT,   17),
+    ]
+    for txt, fill, col in headers:
+        c = ws.cell(2, col, txt)
+        c.fill = fill; c.font = BOLD_W; c.alignment = AC; c.border = brd
+
     ws.row_dimensions[1].height = 22
     ws.row_dimensions[2].height = 40
-    ws.freeze_panes = 'B3'
 
-    # Fila 1: bandas de sección (sin merge — primera celda lleva el texto)
-    sec_fills = [F_CAMP, F_SALTO, F_SALTO, F_SALTO, F_SALTO, F_VIS,
-                 F_HOT, F_HOT, F_HOT, F_HOT, F_HOT, F_HOT, F_HOT, F_TODO, F_TODO, F_ACT, F_ACT]
-    sec_texts = ["Campamento", "SALTO", "", "", "", "",
-                 "BBDD Hotelería", "", "", "", "", "", "", "", "", "", ""]
-    ws.append([_woc(ws, t, fill=f, font=BOLD_W, align=AC)
-               for t, f in zip(sec_texts, sec_fills)])
-
-    # Fila 2: encabezados de columna
-    hdr_defs = [
-        ("Campamento", F_CAMP), ("Total\nUsuarios", F_SALTO),
-        ("Con 1 Hab.\nAsignada", F_SALTO), ("Con Calendario\nAsignado", F_SALTO),
-        ("Con Tabla\nHorario Asignada", F_SALTO), ("Sobrantes\n(Visitas)", F_VIS),
-        ("Total\nUsuarios", F_HOT), ("Con Solo 1 Hab.\nAsig. en Salto", F_HOT),
-        ("% Asig.\nHab.", F_HOT), ("Con Calendario\nAsignado", F_HOT),
-        ("% Asig.\nCalendario", F_HOT), ("Con Tabla\nHorario Asignada", F_HOT),
-        ("% Asig.\nTabla Horario", F_HOT), ("Con Hab., Cal.\ny Tabla Hor.", F_TODO),
-        ("% Avance\nReal", F_TODO), ("Total Act.\nTarjetas", F_ACT),
-        ("% Act.\nTarjetas", F_ACT),
-    ]
-    ws.append([_woc(ws, txt, fill=fill, font=BOLD_W, align=AC) for txt, fill in hdr_defs])
-
-    # Filas de datos
+    # ── Filas de datos ─────────────────────────────────────────────
     for i, fila in enumerate(filas, start=3):
         es_total = fila.get('Campamento') == 'TOTAL'
-        rf = NORM_B if es_total else NORM
-        vis = fila.get('SAL_Visitas', 0)
-        vis_str = f"{int(vis):,}\n(visitas)".replace(',', '.') if not es_total else str(vis)
-        data = [
-            (fila.get('Campamento',''),          F_TOTAL if es_total else F_CAMP,   BOLD_W),
-            (fila.get('SAL_Total',''),            F_TOTAL if es_total else F_DATA_S, rf),
-            (fila.get('SAL_Con Hab',''),          F_TOTAL if es_total else F_DATA_S, rf),
-            (fila.get('SAL_Con Calendario',''),   F_TOTAL if es_total else F_DATA_S, rf),
-            (fila.get('SAL_Con Tabla Horario',''),F_TOTAL if es_total else F_DATA_S, rf),
-            (vis_str,                             F_TOTAL if es_total else F_VIS,    BOLD_W),
-            (fila.get('HOT_Total',''),            F_TOTAL if es_total else F_DATA_H, rf),
-            (fila.get('HOT_Con Hab en Salto',''), F_TOTAL if es_total else F_DATA_H, rf),
-            (f"{fila.get('HOT_pct_Hab',0)}%",    F_TOTAL if es_total else F_PCT,    rf),
-            (fila.get('HOT_Con Calendario',''),   F_TOTAL if es_total else F_DATA_H, rf),
-            (f"{fila.get('HOT_pct_Cal',0)}%",     F_TOTAL if es_total else F_PCT,    rf),
-            (fila.get('HOT_Con Tabla Horario',''),F_TOTAL if es_total else F_DATA_H, rf),
-            (f"{fila.get('HOT_pct_Hor',0)}%",    F_TOTAL if es_total else F_PCT,    rf),
-            (fila.get('HOT_Con Todo',''),         F_TOTAL if es_total else F_DATA_T, rf),
-            (f"{fila.get('HOT_pct_Todo',0)}%",   F_TOTAL if es_total else F_DATA_T, rf),
-            (fila.get('HOT_Act Tarjetas',''),     F_TOTAL if es_total else F_DATA_A, rf),
-            (f"{fila.get('HOT_pct_Act',0)}%",    F_TOTAL if es_total else F_DATA_A, rf),
+        row_font = NORM_B if es_total else NORM
+
+        data_cols = [
+            (fila['Campamento'],            F_TOTAL if es_total else F_CAMP,   BOLD_W if es_total else BOLD_W),
+            (fila['SAL_Total'],             F_TOTAL if es_total else F_DATA_S, row_font),
+            (fila['SAL_Con Hab'],           F_TOTAL if es_total else F_DATA_S, row_font),
+            (fila['SAL_Con Calendario'],    F_TOTAL if es_total else F_DATA_S, row_font),
+            (fila['SAL_Con Tabla Horario'], F_TOTAL if es_total else F_DATA_S, row_font),
+            # Visitas: valor + "(visitas)"
+            (f"{fila['SAL_Visitas']:,}\n(visitas)" if isinstance(fila.get('SAL_Visitas'), int)
+             else fila.get('SAL_Visitas',''),
+             F_TOTAL if es_total else F_VIS, BOLD_W if not es_total else NORM_B),
+            (fila['HOT_Total'],             F_TOTAL if es_total else F_DATA_H, row_font),
+            (fila['HOT_Con Hab en Salto'],  F_TOTAL if es_total else F_DATA_H, row_font),
+            (f"{fila['HOT_pct_Hab']}%",     F_TOTAL if es_total else F_PCT,    row_font),
+            (fila['HOT_Con Calendario'],    F_TOTAL if es_total else F_DATA_H, row_font),
+            (f"{fila['HOT_pct_Cal']}%",     F_TOTAL if es_total else F_PCT,    row_font),
+            (fila['HOT_Con Tabla Horario'], F_TOTAL if es_total else F_DATA_H, row_font),
+            (f"{fila['HOT_pct_Hor']}%",     F_TOTAL if es_total else F_PCT,    row_font),
+            (fila['HOT_Con Todo'],          F_TOTAL if es_total else F_DATA_T, row_font),
+            (f"{fila['HOT_pct_Todo']}%",    F_TOTAL if es_total else F_DATA_T, row_font),
+            (fila['HOT_Act Tarjetas'],      F_TOTAL if es_total else F_DATA_A, row_font),
+            (f"{fila['HOT_pct_Act']}%",     F_TOTAL if es_total else F_DATA_A, row_font),
         ]
+
+        for col_idx, (val, fill, fnt) in enumerate(data_cols, start=1):
+            c = ws.cell(i, col_idx, val)
+            c.fill  = fill
+            c.font  = fnt if not (col_idx == 1 and not es_total) else Font(bold=True, color="FFFFFF", size=10)
+            c.alignment = AC
+            c.border = brd
+
         ws.row_dimensions[i].height = 26
-        ws.append([_woc(ws, val, fill=fill, font=fnt, align=AC) for val, fill, fnt in data])
+
+    # ── Anchos de columna ─────────────────────────────────────────
+    widths = [18, 12, 14, 16, 16, 14, 12, 18, 10, 16, 12, 16, 14, 16, 10, 14, 12]
+    for col_idx, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = w
+
+    ws.freeze_panes = 'B3'
 
 
 def _escribir_glosario_excel(ws):
-    """Hoja explicativa de cada métrica del Resumen Ejecutivo — write_only compatible."""
+    """Hoja explicativa de cada métrica del Resumen Ejecutivo."""
+    from openpyxl.styles import Border, Side
 
     # ── Paleta ────────────────────────────────────────────────────
     F_TITULO  = PatternFill("solid", fgColor="1A1A2E")   # casi negro
@@ -1056,18 +1089,22 @@ def _escribir_glosario_excel(ws):
     F_HOT     = PatternFill("solid", fgColor="C55A11")   # naranja HOT
     F_TODO    = PatternFill("solid", fgColor="922B21")   # rojo Con Todo
     F_ACT     = PatternFill("solid", fgColor="7F7F7F")   # gris Tarjetas
+    F_VIS     = PatternFill("solid", fgColor="1F5C99")   # azul Visitas
     F_HEADER  = PatternFill("solid", fgColor="D9D9D9")   # gris claro encabezados
     F_EVEN    = PatternFill("solid", fgColor="F7F9FB")   # fila par
     F_ODD     = PatternFill("solid", fgColor="FFFFFF")   # fila impar
-    F_NOTA    = PatternFill("solid", fgColor="FFF9C4")   # amarillo suave
 
     BOLD_W = Font(bold=True, color="FFFFFF", size=11)
     BOLD_B = Font(bold=True, color="1A1A1A", size=11)
-    NORM   = Font(size=10,  color="1A1A1A")
-    SMALL  = Font(size=9,   color="555555", italic=True)
-    NOTA_F = Font(size=9,   color="5D4037", italic=True)
+    NORM   = Font(size=10, color="1A1A1A")
+    SMALL  = Font(size=9,  color="555555", italic=True)
     AC = Alignment(horizontal='center', vertical='center', wrap_text=True)
     AL = Alignment(horizontal='left',   vertical='center', wrap_text=True)
+
+    thin = Side(style='thin', color='CCCCCC')
+    med  = Side(style='medium', color='999999')
+    brd  = Border(left=thin, right=thin, top=thin, bottom=thin)
+    brd_med = Border(left=med, right=med, top=med, bottom=med)
 
     # ── Anchos ────────────────────────────────────────────────────
     ws.column_dimensions['A'].width = 6    # #
@@ -1076,35 +1113,33 @@ def _escribir_glosario_excel(ws):
     ws.column_dimensions['D'].width = 30   # Fuente
     ws.column_dimensions['E'].width = 24   # Fórmula
 
-    ws.freeze_panes = 'B5'
+    row = 1
 
-    # Helper: fila que ocupa las 5 columnas (simula merge sin API incompatible)
-    def _full_row(text, fill, font, align=AL):
-        return [
-            _woc(ws, text, fill=fill, font=font, align=align),
-            _woc(ws, '',   fill=fill, font=font, align=align),
-            _woc(ws, '',   fill=fill, font=font, align=align),
-            _woc(ws, '',   fill=fill, font=font, align=align),
-            _woc(ws, '',   fill=fill, font=font, align=align),
-        ]
+    # ── Título ────────────────────────────────────────────────────
+    ws.merge_cells(f'A{row}:E{row}')
+    c = ws.cell(row, 1, "GLOSARIO — Resumen Ejecutivo de Asignaciones")
+    c.fill = F_TITULO; c.font = BOLD_W; c.alignment = AC
+    ws.row_dimensions[row].height = 28
+    row += 1
 
-    # ── Fila 1: Título ────────────────────────────────────────────
-    ws.append(_full_row("GLOSARIO — Resumen Ejecutivo de Asignaciones", F_TITULO, BOLD_W, AC))
-
-    # ── Fila 2: Subtítulo ─────────────────────────────────────────
-    ws.append(_full_row(
+    ws.merge_cells(f'A{row}:E{row}')
+    c = ws.cell(row, 1,
         "Descripción de cada indicador que aparece en la hoja «Resumen Ejecutivo». "
         "Las columnas de porcentaje (%) se calculan sobre el universo de usuarios "
-        "presentes en BBDD Hotelería que tienen un registro coincidente en El Salto (usuarios comunes).",
-        F_EVEN, SMALL, AL
-    ))
+        "presentes en BBDD Hotelería que tienen un registro coincidente en El Salto (usuarios comunes).")
+    c.fill = F_EVEN; c.font = SMALL; c.alignment = AL
+    ws.row_dimensions[row].height = 36
+    row += 1
 
-    # ── Fila 3: Espacio ───────────────────────────────────────────
-    ws.append(_full_row('', F_ODD, NORM))
+    row += 1  # espaciado
 
-    # ── Fila 4: Encabezados de columna ────────────────────────────
+    # ── Encabezados de columna ────────────────────────────────────
     headers = ["#", "Métrica", "Descripción", "Fuente de datos", "Fórmula / Criterio"]
-    ws.append([_woc(ws, h, fill=F_HEADER, font=BOLD_B, align=AC) for h in headers])
+    for col_idx, h in enumerate(headers, 1):
+        c = ws.cell(row, col_idx, h)
+        c.fill = F_HEADER; c.font = BOLD_B; c.alignment = AC; c.border = brd
+    ws.row_dimensions[row].height = 22
+    row += 1
 
     # ── Métricas ──────────────────────────────────────────────────
     # Formato: (nº, nombre, descripción, fuente, fórmula, color_sección)
@@ -1224,24 +1259,37 @@ def _escribir_glosario_excel(ws):
         bg = color_sec if is_header else (F_EVEN if i % 2 == 0 else F_ODD)
 
         if is_header:
-            ws.append(_full_row(nombre, color_sec, BOLD_W, AL))
+            # Fila de sección: merge toda la fila
+            ws.merge_cells(f'A{row}:E{row}')
+            c = ws.cell(row, 1, nombre)
+            c.fill = color_sec; c.font = BOLD_W; c.alignment = AL
+            c.border = brd
+            ws.row_dimensions[row].height = 20
         else:
-            ws.append([
-                _woc(ws, num,     fill=bg, font=NORM,   align=AL),
-                _woc(ws, nombre,  fill=bg, font=BOLD_B, align=AL),
-                _woc(ws, desc,    fill=bg, font=NORM,   align=AL),
-                _woc(ws, fuente,  fill=bg, font=NORM,   align=AL),
-                _woc(ws, formula, fill=bg, font=NORM,   align=AL),
-            ])
+            vals = [num, nombre, desc, fuente, formula]
+            for col_idx, val in enumerate(vals, 1):
+                c = ws.cell(row, col_idx, val)
+                c.fill = bg
+                c.font = BOLD_B if col_idx == 2 else NORM
+                c.alignment = AL
+                c.border = brd
+            ws.row_dimensions[row].height = 54
 
-    # ── Espacio + Nota al pie ─────────────────────────────────────
-    ws.append(_full_row('', F_ODD, NORM))
-    ws.append(_full_row(
+        row += 1
+
+    # ── Nota al pie ───────────────────────────────────────────────
+    row += 1
+    ws.merge_cells(f'A{row}:E{row}')
+    c = ws.cell(row, 1,
         "NOTA: Los usuarios 'comunes' son aquellos cuyo RUT aparece en AMBOS sistemas (El Salto y Hotelería). "
         "Los porcentajes de las columnas HOT se calculan sobre el total de usuarios de Hotelería del campamento, "
-        "no sobre los comunes, para reflejar la cobertura real del sistema.",
-        F_NOTA, NOTA_F, AL
-    ))
+        "no sobre los comunes, para reflejar la cobertura real del sistema.")
+    c.fill = PatternFill("solid", fgColor="FFF9C4")   # amarillo suave
+    c.font = Font(size=9, color="5D4037", italic=True)
+    c.alignment = AL
+    ws.row_dimensions[row].height = 42
+
+    ws.freeze_panes = 'B5'
 
 
 # ─────────────────────────────────────────────
