@@ -575,11 +575,38 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
     df_hot['_NM_EQ']  = df_hot['_HAB'].map(h2n)
     df_sal['_HAB_EQ'] = df_sal['_DOOR'].map(n2h)
 
-    # ── Índices por RUT (vectorizado — sin iterrows) ──────────────
-    _hot_nonempty = df_hot[df_hot['_RUT'] != '']
+    # ── Detectar RUTs duplicados antes de deduplicar ─────────────
+    def _get_duplicados(df, col_rut, col_nombre, col_extra=None):
+        """Retorna lista de dicts con los RUTs que aparecen más de una vez."""
+        dup_mask = df[col_rut].duplicated(keep=False) & (df[col_rut] != '')
+        dup_df   = df[dup_mask].copy()
+        if dup_df.empty:
+            return []
+        result = []
+        for rut, grupo in dup_df.groupby(col_rut):
+            for _, row in grupo.iterrows():
+                rec = {'RUT': rut, 'Nombre': limpiar(row.get(col_nombre, ''))}
+                if col_extra:
+                    for label, col in col_extra.items():
+                        rec[label] = limpiar(row.get(col, '')) if col else ''
+                result.append(rec)
+        return result
+
+    ruts_dup_hot = _get_duplicados(
+        df_hot[df_hot['_RUT'] != ''], '_RUT', hot_nom,
+        {'HAB': hot_hab, 'Empresa': hot_emp, 'Módulo': hot_mod}
+    ) if hot_nom else []
+
+    ruts_dup_sal = _get_duplicados(
+        df_sal[df_sal['_RUT'] != ''], '_RUT', sal_name or 'FullName',
+        {'HAB El Salto': sal_door}
+    ) if es_csv_salto else []
+
+    # ── Índices por RUT (keep='last' = mismo comportamiento que dict comp.) ─
+    _hot_nonempty = df_hot[df_hot['_RUT'] != ''].drop_duplicates(subset='_RUT', keep='last')
     hot_idx = _hot_nonempty.set_index('_RUT').to_dict('index')
 
-    _sal_nonempty = df_sal[df_sal['_RUT'] != '']
+    _sal_nonempty = df_sal[df_sal['_RUT'] != ''].drop_duplicates(subset='_RUT', keep='last')
     sal_idx = _sal_nonempty.set_index('_RUT').to_dict('index')
 
     comunes    = sorted(set(hot_idx) & set(sal_idx))
