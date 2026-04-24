@@ -9,6 +9,7 @@ import re
 import csv
 import uuid
 import json
+import gzip
 import traceback
 import psycopg2
 import psycopg2.extras
@@ -180,7 +181,27 @@ def cargar_mapa_db():
     return None, None
 
 
-def guardar_excel_db(token, excel_bytes):
+def _make_json_safe(obj):
+    """Convierte recursivamente a tipos nativos serializables en JSON."""
+    if isinstance(obj, dict):
+        return {k: _make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_make_json_safe(v) for v in obj]
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, int):
+        return int(obj)
+    if isinstance(obj, float):
+        return float(obj)
+    if obj is None:
+        return None
+    return str(obj)
+
+
+def guardar_resultados_db(token, results):
+    """Guarda los resultados como JSON comprimido (gzip) — sin generar Excel."""
+    payload = json.dumps(_make_json_safe(results), ensure_ascii=False).encode('utf-8')
+    compressed = gzip.compress(payload, compresslevel=6)
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -189,11 +210,12 @@ def guardar_excel_db(token, excel_bytes):
                 ON CONFLICT (token) DO UPDATE
                     SET excel_data = EXCLUDED.excel_data,
                         created_at = NOW();
-            """, (token, psycopg2.Binary(excel_bytes)))
+            """, (token, psycopg2.Binary(compressed)))
         conn.commit()
 
 
-def cargar_excel_db(token):
+def cargar_resultados_db(token):
+    """Carga y descomprime los resultados; genera Excel en el momento de descarga."""
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
@@ -202,8 +224,9 @@ def cargar_excel_db(token):
                     (token,)
                 )
                 row = cur.fetchone()
-                if row:
-                    return bytes(row[0])
+                if row and row[0]:
+                    decompressed = gzip.decompress(bytes(row[0]))
+                    return json.loads(decompressed.decode('utf-8'))
     except Exception:
         pass
     return None
@@ -1402,9 +1425,9 @@ def procesar_ruta():
             mapa_src = df_mapa
 
         results = procesar(mapa_src, salto_b, hotel_b)
-        excel_b  = generar_excel(results)
-        token    = str(uuid.uuid4())
-        guardar_excel_db(token, excel_b)
+        token   = str(uuid.uuid4())
+        # Guarda solo los resultados (JSON comprimido) — Excel se genera al descargar
+        guardar_resultados_db(token, results)
 
         return render_template('results.html', results=results, token=token)
 
@@ -1421,11 +1444,13 @@ def _mapa_ctx():
 
 @app.route('/descargar/<token>')
 def descargar(token):
-    excel_b = cargar_excel_db(token)
-    if not excel_b:
+    results = cargar_resultados_db(token)
+    if not results:
         return render_template('index.html',
                                error='El reporte expiró (7 días). Procesa los archivos nuevamente.',
                                **_mapa_ctx())
+    # Excel se genera aquí, en un request separado — sin presión de timeout en el proceso
+    excel_b = generar_excel(results)
     return send_file(
         io.BytesIO(excel_b),
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
