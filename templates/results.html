@@ -311,6 +311,19 @@
         <div class="label">Sin Tabla Horario<br><small style="font-size:.6rem;opacity:.8;">(en Hotelería)</small></div>
       </div>
     </div>
+    {% if results.es_csv_salto %}
+    <div class="col-6 col-md-3 col-lg">
+      <div class="stat-card bg-cal">
+        <div class="num">{{ results.stats.sal_sin_calendario }}</div>
+        <div class="label">Sin Calendario<br><small style="font-size:.6rem;opacity:.8;">(El Salto completo)</small></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+      <div class="stat-card bg-hor">
+        <div class="num">{{ results.stats.sal_sin_tabla_horario }}</div>
+        <div class="label">Sin Tabla Horario<br><small style="font-size:.6rem;opacity:.8;">(El Salto completo)</small></div>
+      </div>
+    </div>
     {% endif %}
     <div class="col-6 col-md-3 col-lg">
       <div class="stat-card bg-mapa">
@@ -480,14 +493,26 @@
     {% if results.es_csv_salto %}
     <li class="nav-item">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sin-cal">
-        <i class="bi bi-calendar-x me-1" style="color:#8d6e63;"></i>Sin Calendario
+        <i class="bi bi-calendar-x me-1" style="color:#8d6e63;"></i>Sin Cal. <small class="opacity-75">(HOT)</small>
         <span class="badge ms-1" style="background:#8d6e63;">{{ results.sin_calendario|length }}</span>
       </button>
     </li>
     <li class="nav-item">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sin-hor">
-        <i class="bi bi-clock-history me-1" style="color:#ef6c00;"></i>Sin Tabla Horario
+        <i class="bi bi-clock-history me-1" style="color:#ef6c00;"></i>Sin Hor. <small class="opacity-75">(HOT)</small>
         <span class="badge ms-1" style="background:#ef6c00;">{{ results.sin_tabla_horario|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sal-sin-cal">
+        <i class="bi bi-calendar-x me-1" style="color:#5c6bc0;"></i>Sin Cal. <small class="opacity-75">(SAL)</small>
+        <span class="badge ms-1" style="background:#5c6bc0;">{{ results.sal_sin_calendario|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sal-sin-hor">
+        <i class="bi bi-clock-history me-1" style="color:#00897b;"></i>Sin Hor. <small class="opacity-75">(SAL)</small>
+        <span class="badge ms-1" style="background:#00897b;">{{ results.sal_sin_tabla_horario|length }}</span>
       </button>
     </li>
     {% endif %}
@@ -875,6 +900,100 @@
       {% else %}
       <div class="alert alert-success mt-3">
         <i class="bi bi-check-circle-fill me-2"></i>Todo el personal de Hotelería tiene una tabla de horario válida asignada.
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# ═══ TAB 7: Sin Calendario El Salto completo ═══ #}
+    {% if results.es_csv_salto %}
+    <div class="tab-pane fade" id="tab-sal-sin-cal">
+      <p class="text-muted small mt-3 mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Todos</strong> los usuarios registrados en El Salto con <strong>calendario no válido</strong>,
+        incluyendo visitas y contratistas externos. Universo: {{ results.stats.total_salto }} personas.
+      </p>
+      {% if results.sal_sin_calendario %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered dataTable" id="tbl-sal-sin-cal">
+          <thead><tr>
+            <th>RUT/ExtID</th><th>Nombre</th><th>En Hotelería</th>
+            <th>HAB El Salto</th>
+            <th>Calendario actual</th><th>Tipo Calendario</th>
+            <th>Tabla Horario</th><th>Clasif. Horario</th><th>Estado Llave</th>
+          </tr></thead>
+          <tbody>
+            {% for r in results.sal_sin_calendario %}
+            <tr>
+              <td><code>{{ r['RUT/ExtID'] }}</code></td>
+              <td>{{ r.Nombre }}</td>
+              <td>
+                {% if r['En Hotelería'] == 'Sí' %}
+                  <span class="badge bg-success">Sí</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ r['En Hotelería'] }}</span>
+                {% endif %}
+              </td>
+              <td>{{ r['HAB El Salto'] }}</td>
+              <td><span class="badge" style="background:#5c6bc0;">{{ r.Calendario }}</span></td>
+              <td>{{ r['Tipo Calendario'] }}</td>
+              <td>{{ r['Tabla Horario'] }}</td>
+              <td>{{ r['Clasif. Horario'] }}</td>
+              <td>{{ r['Estado Llave'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-success mt-3">
+        <i class="bi bi-check-circle-fill me-2"></i>Todos los usuarios de El Salto tienen un calendario válido asignado.
+      </div>
+      {% endif %}
+    </div>
+
+    {# ═══ TAB 8: Sin Tabla Horario El Salto completo ═══ #}
+    <div class="tab-pane fade" id="tab-sal-sin-hor">
+      <p class="text-muted small mt-3 mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Todos</strong> los usuarios registrados en El Salto con <strong>tabla de horario no válida</strong>,
+        incluyendo visitas y contratistas externos. Universo: {{ results.stats.total_salto }} personas.
+      </p>
+      {% if results.sal_sin_tabla_horario %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered dataTable" id="tbl-sal-sin-hor">
+          <thead><tr>
+            <th>RUT/ExtID</th><th>Nombre</th><th>En Hotelería</th>
+            <th>HAB El Salto</th>
+            <th>Tabla Horario actual</th><th>Clasif. Horario</th>
+            <th>Calendario</th><th>Tipo Calendario</th><th>Estado Llave</th>
+          </tr></thead>
+          <tbody>
+            {% for r in results.sal_sin_tabla_horario %}
+            <tr>
+              <td><code>{{ r['RUT/ExtID'] }}</code></td>
+              <td>{{ r.Nombre }}</td>
+              <td>
+                {% if r['En Hotelería'] == 'Sí' %}
+                  <span class="badge bg-success">Sí</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ r['En Hotelería'] }}</span>
+                {% endif %}
+              </td>
+              <td>{{ r['HAB El Salto'] }}</td>
+              <td><span class="badge" style="background:#00897b;">{{ r['Tabla Horario'] }}</span></td>
+              <td>{{ r['Clasif. Horario'] }}</td>
+              <td>{{ r.Calendario }}</td>
+              <td>{{ r['Tipo Calendario'] }}</td>
+              <td>{{ r['Estado Llave'] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-success mt-3">
+        <i class="bi bi-check-circle-fill me-2"></i>Todos los usuarios de El Salto tienen una tabla de horario válida asignada.
       </div>
       {% endif %}
     </div>
