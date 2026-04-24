@@ -324,6 +324,12 @@
         <div class="label">Sin Tabla Horario<br><small style="font-size:.6rem;opacity:.8;">(El Salto completo)</small></div>
       </div>
     </div>
+    <div class="col-6 col-md-3 col-lg">
+      <div class="stat-card" style="background:linear-gradient(135deg,#1565c0,#42a5f5);">
+        <div class="num">{{ results.stats.multi_hab }}</div>
+        <div class="label">Multi Habitación<br><small style="font-size:.6rem;opacity:.8;">(más de 1 en Salto)</small></div>
+      </div>
+    </div>
     {% endif %}
     <div class="col-6 col-md-3 col-lg">
       <div class="stat-card bg-mapa">
@@ -513,6 +519,12 @@
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sal-sin-hor">
         <i class="bi bi-clock-history me-1" style="color:#00897b;"></i>Sin Hor. <small class="opacity-75">(SAL)</small>
         <span class="badge ms-1" style="background:#00897b;">{{ results.sal_sin_tabla_horario|length }}</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-multi-hab">
+        <i class="bi bi-door-open me-1" style="color:#1565c0;"></i>Multi HAB
+        <span class="badge ms-1" style="background:#1565c0;">{{ results.multi_hab|length }}</span>
       </button>
     </li>
     {% endif %}
@@ -997,6 +1009,55 @@
       </div>
       {% endif %}
     </div>
+    {# ═══ TAB: Multi Habitación ═══ #}
+    {% if results.es_csv_salto %}
+    <div class="tab-pane fade" id="tab-multi-hab">
+      <p class="text-muted small mt-3 mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Usuarios de El Salto con <strong>más de una habitación/puerta asignada</strong>.
+        Se muestra la habitación principal (primera del listado) y todas las asignadas.
+        Total: <strong>{{ results.multi_hab|length }}</strong> usuarios.
+      </p>
+      {% if results.multi_hab %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered dataTable" id="tbl-multi-hab">
+          <thead><tr>
+            <th>RUT/ExtID</th><th>Nombre</th><th>En Hotelería</th>
+            <th>HAB Hotelería</th><th>N° Puertas</th><th>Todas las HAB (El Salto)</th>
+            <th>Empresa</th><th>Módulo</th><th>Calendario</th><th>Estado Llave</th>
+          </tr></thead>
+          <tbody>
+            {% for r in results.multi_hab %}
+            <tr>
+              <td><code>{{ r['RUT/ExtID'] }}</code></td>
+              <td>{{ r.Nombre }}</td>
+              <td>
+                {% if r['En Hotelería'] == 'Sí' %}
+                  <span class="badge bg-success">Sí</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ r['En Hotelería'] }}</span>
+                {% endif %}
+              </td>
+              <td>{{ r.get('HAB Hotelería','') }}</td>
+              <td class="text-center fw-bold" style="color:#1565c0;">{{ r['N° Puertas'] }}</td>
+              <td><small>{{ r['Todas las HAB'] }}</small></td>
+              <td>{{ r.get('Empresa','') }}</td>
+              <td>{{ r.get('Módulo','') }}</td>
+              <td>{{ r.get('Calendario','') }}</td>
+              <td>{{ r.get('Estado Llave','') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-success mt-3">
+        <i class="bi bi-check-circle-fill me-2"></i>Ningún usuario tiene más de una habitación asignada en El Salto.
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {% endif %}
 
     {# ═══ TAB: Sin mapa ═══ #}
