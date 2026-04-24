@@ -746,6 +746,8 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
         'sin_tabla_horario': sin_tabla_horario,
         'es_csv_salto':      es_csv_salto,
         'resumen_ejecutivo': resumen_ejecutivo,
+        'ruts_dup_hot':      ruts_dup_hot,
+        'ruts_dup_sal':      ruts_dup_sal,
         'stats': {
             'total_hotel':       len(df_hot),
             'total_salto':       len(df_sal),
@@ -757,6 +759,8 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
             'solo_salto':        len(solo_salto),
             'hab_sin_mapa':      len(hab_sin_mapa),
             'door_sin_mapa':     len(door_sin_mapa),
+            'ruts_dup_hot':      len(ruts_dup_hot),
+            'ruts_dup_sal':      len(ruts_dup_sal),
             'sin_calendario':    len(sin_calendario),
             'sin_tabla_horario': len(sin_tabla_horario),
             # Porcentajes de cumplimiento
