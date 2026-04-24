@@ -284,21 +284,22 @@ def _es_csv(data_bytes):
 
 def parse_door_list(val):
     """
-    Extrae (nombre_puerta, tabla_horario_id) del formato:
-    {{"VCA-M26-P1-L2601-2",6,,}}
-    Toma la primera puerta si hay varias.
+    Extrae (nombre_puerta_principal, tabla_horario_id, lista_todas_puertas) del formato:
+    {{"VCA-M26-P1-L2601-2",6,,}}  o  {{"PUERTA-A",6,,},{"PUERTA-B",0,,}}
+    Retorna la primera puerta como principal; todas en lista.
     """
     val = str(val).strip()
     if not val or val in ('', '{}', '{{}}', '{{,}}'):
-        return '', -1
+        return '', -1, []
     matches = re.findall(r'"([^"]+)",\s*(-?\d+)', val)
     if matches:
+        all_doors = [m[0].strip() for m in matches]
         door_name, horario_id_str = matches[0]
-        return door_name.strip(), int(horario_id_str)
+        return door_name.strip(), int(horario_id_str), all_doors
     m = re.search(r'"([^"]+)"', val)
     if m:
-        return m.group(1).strip(), -1
-    return '', -1
+        return m.group(1).strip(), -1, [m.group(1).strip()]
+    return '', -1, []
 
 
 def leer_csv_salto(data_bytes):
@@ -342,8 +343,8 @@ def leer_csv_salto(data_bytes):
             key_status = 0
         estado_llave = TABLA_KEY_STATUS.get(key_status, f'Estado {key_status}')
 
-        # ExtDoorIDList → Puerta + Tabla Horario
-        door_name, horario_id = parse_door_list(door_raw)
+        # ExtDoorIDList → Puerta + Tabla Horario + todas las puertas
+        door_name, horario_id, all_doors = parse_door_list(door_raw)
         hor_nombre, hor_clasif = TABLA_HORARIO.get(
             horario_id, (f'ID {horario_id} (Desconocido)', 'Desconocido'))
 
@@ -351,6 +352,8 @@ def leer_csv_salto(data_bytes):
             'ExtID':               ext_id,
             'FullName':            first_name,
             'NameDoorList':        door_name,
+            'TodasLasPuertas':     ' | '.join(all_doors),
+            'CantidadPuertas':     len(all_doors),
             'TablaHorarioID':      horario_id,
             'TablaHorario':        hor_nombre,
             'ClasifTablaHorario':  hor_clasif,
@@ -677,6 +680,28 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
               .apply(limpiar).replace('', pd.NA).dropna().unique().tolist()
     )
 
+    # ── Usuarios con más de una habitación (El Salto) ────────────
+    multi_hab = []
+    if es_csv_salto and 'CantidadPuertas' in df_sal.columns:
+        hot_ruts_for_multi = frozenset(hot_idx.keys())
+        df_multi = df_sal[df_sal['CantidadPuertas'] > 1].copy()
+        for rut, row in df_multi.set_index('_RUT').to_dict('index').items():
+            en_hot = rut in hot_ruts_for_multi
+            h      = hot_idx[rut] if en_hot else {}
+            multi_hab.append({
+                'RUT/ExtID':      rut,
+                'Nombre':         limpiar(row.get('FullName', '')),
+                'En Hotelería':   'Sí' if en_hot else 'No (visita)',
+                'HAB Hotelería':  limpiar(h.get(hot_hab, '')) if (en_hot and hot_hab) else '',
+                'N° Puertas':     int(row.get('CantidadPuertas', 0)),
+                'Todas las HAB':  limpiar(row.get('TodasLasPuertas', '')),
+                'Empresa':        limpiar(h.get(hot_emp, '')) if (en_hot and hot_emp) else '',
+                'Módulo':         limpiar(h.get(hot_mod, '')) if (en_hot and hot_mod) else '',
+                'Calendario':     limpiar(row.get('Calendario', '')),
+                'Tipo Calendario':limpiar(row.get('TipoCalendario', '')),
+                'Estado Llave':   limpiar(row.get('EstadoLlave', '')),
+            })
+
     # ── Sin Calendario / Sin Tabla Horario ───────────────────────
     # sin_calendario / sin_tabla_horario → solo usuarios en AMBAS bases (Hotelería)
     # sal_sin_calendario / sal_sin_tabla_horario → TODOS los usuarios de El Salto
@@ -778,6 +803,7 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
         'sin_tabla_horario':     sin_tabla_horario,
         'sal_sin_calendario':    sal_sin_calendario,
         'sal_sin_tabla_horario': sal_sin_tabla_horario,
+        'multi_hab':             multi_hab,
         'es_csv_salto':          es_csv_salto,
         'resumen_ejecutivo': resumen_ejecutivo,
         'ruts_dup_hot':      ruts_dup_hot,
@@ -797,6 +823,7 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
             'ruts_dup_sal':           len(ruts_dup_sal),
             'sal_sin_calendario':     len(sal_sin_calendario),
             'sal_sin_tabla_horario':  len(sal_sin_tabla_horario),
+            'multi_hab':              len(multi_hab),
             'sin_calendario':    len(sin_calendario),
             'sin_tabla_horario': len(sin_tabla_horario),
             # Porcentajes de cumplimiento
@@ -884,6 +911,10 @@ def generar_excel(results):
     if results.get('sal_sin_tabla_horario'):
         ws8 = wb.create_sheet("Sin Hor. (El Salto)")
         _escribir_hoja(ws8, results['sal_sin_tabla_horario'], AMARILLO)
+
+    if results.get('multi_hab'):
+        ws9 = wb.create_sheet("Multi Habitación")
+        _escribir_hoja(ws9, results['multi_hab'], NARANJA)
 
     for titulo, lista in [("Sin mapa (Hotelería)", results['hab_sin_mapa']),
                           ("Sin mapa (El Salto)",  results['door_sin_mapa'])]:
