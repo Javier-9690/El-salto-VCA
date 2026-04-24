@@ -423,10 +423,11 @@ def _calcular_resumen_ejecutivo(df_sal, df_hot, df_map,
     sal_act       = df_sal['EstadoLlave'].fillna('').isin(needs_update)
     sal_con_todo  = sal_tiene_hab & sal_tiene_cal & sal_tiene_hor
 
-    # ── Determinar campamentos ────────────────────────────────────
-    all_camps = sorted(
+    # ── Determinar campamentos (incluye 'Sin mapa' al final) ─────
+    named_camps = sorted(
         set(list(hab_to_camp.values()) + list(door_to_camp.values())) - {''} - {'Sin mapa'}
     ) or ['VCA']
+    all_camps = named_camps + ['Sin mapa']
 
     filas = []
     for camp in all_camps:
@@ -574,8 +575,12 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
     df_hot['_NM_EQ']  = df_hot['_HAB'].map(h2n)
     df_sal['_HAB_EQ'] = df_sal['_DOOR'].map(n2h)
 
-    hot_idx = {r['_RUT']: r for _, r in df_hot.iterrows() if r['_RUT']}
-    sal_idx = {r['_RUT']: r for _, r in df_sal.iterrows() if r['_RUT']}
+    # ── Índices por RUT (vectorizado — sin iterrows) ──────────────
+    _hot_nonempty = df_hot[df_hot['_RUT'] != '']
+    hot_idx = _hot_nonempty.set_index('_RUT').to_dict('index')
+
+    _sal_nonempty = df_sal[df_sal['_RUT'] != '']
+    sal_idx = _sal_nonempty.set_index('_RUT').to_dict('index')
 
     comunes    = sorted(set(hot_idx) & set(sal_idx))
     solo_hot_k = sorted(set(hot_idx) - set(sal_idx))
@@ -635,12 +640,15 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
         **extra_sal(sal_idx[rut]),
     } for rut in solo_sal_k]
 
-    hab_sin_mapa  = sorted({limpiar(r.get(hot_hab,''))
-        for _, r in df_hot.iterrows()
-        if not r.get('_NM_EQ') and limpiar(r.get(hot_hab,''))})
-    door_sin_mapa = sorted({limpiar(r.get(sal_door,''))
-        for _, r in df_sal.iterrows()
-        if not r.get('_HAB_EQ') and limpiar(r.get(sal_door,''))})
+    # ── Sin mapa (vectorizado) ────────────────────────────────────
+    hab_sin_mapa = sorted(
+        df_hot.loc[df_hot['_NM_EQ'].fillna('') == '', hot_hab]
+              .apply(limpiar).replace('', pd.NA).dropna().unique().tolist()
+    )
+    door_sin_mapa = sorted(
+        df_sal.loc[df_sal['_HAB_EQ'].fillna('') == '', sal_door]
+              .apply(limpiar).replace('', pd.NA).dropna().unique().tolist()
+    )
 
     # ── Sin Calendario / Sin Tabla Horario ────────────────────────
     # Solo usuarios que aparecen en AMBAS bases (están en Hotelería)
@@ -674,9 +682,9 @@ def procesar(mapa_bytes_o_df, salto_bytes, hotel_bytes):
     pct_concordancia = round(len(coincidencias) / total_comunes * 100, 1) if total_comunes else 0.0
     pct_cobertura    = round(total_comunes / len(hot_idx) * 100, 1) if hot_idx else 0.0
 
-    total_habs_hotel = len({limpiar(r.get(hot_hab, ''))
-                            for _, r in df_hot.iterrows()
-                            if limpiar(r.get(hot_hab, ''))})
+    total_habs_hotel = int(
+        df_hot[hot_hab].apply(limpiar).replace('', pd.NA).dropna().nunique()
+    )
     habs_con_mapa = total_habs_hotel - len(hab_sin_mapa)
     pct_mapa = round(habs_con_mapa / total_habs_hotel * 100, 1) if total_habs_hotel else 0.0
     # guardamos para mostrar en dashboard
